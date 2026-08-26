@@ -1,5 +1,7 @@
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 import { doiUrl, publications, type Publication } from '../src/content/publications'
 import {
@@ -54,6 +56,31 @@ type ClientIdentity = {
   userAgent: string
 }
 
+type LiveConfiguration = {
+  apiKey: string
+  redisUrl: string
+  redisToken: string
+}
+
+type DurableDecision = {
+  success: boolean
+  reason?: unknown
+}
+
+type DurableLimiter = {
+  limit(identifier: string): Promise<DurableDecision>
+}
+
+type DurableLimiters = {
+  ip: DurableLimiter
+  global: DurableLimiter
+}
+
+type ValidatedOpenAiAnswer = {
+  answer: string
+  sourceSlugs: string[]
+}
+
 type ParsedBody =
   | { ok: true; value: Record<string, unknown> }
   | { ok: false; status: 400 | 413; error: string }
@@ -62,8 +89,17 @@ const JSON_CONTENT_TYPE = /^application\/json(?:\s*;|$)/i
 const DEFAULT_MODEL = 'gpt-5.6-luna'
 const MAX_QUESTION_CHARACTERS = 500
 const MAX_GROUNDED_INPUT_CHARACTERS = 12_000
-const MAX_UPSTREAM_ANSWER_CHARACTERS = 12_000
+const MAX_UPSTREAM_OUTPUT_CHARACTERS = 12_000
+const MAX_LIVE_ANSWER_CHARACTERS = 4_000
 const RETRIEVAL_LIMIT = 3
+const LIVE_IP_LIMIT = 8
+const LIVE_GLOBAL_LIMIT = 60
+const LIVE_IP_WINDOW = '1 m'
+const LIVE_GLOBAL_WINDOW = '24 h'
+const LIVE_GLOBAL_IDENTIFIER = 'all-live-calls'
+const DURABLE_LIMIT_TIMEOUT_MS = 2_000
+const URL_LIKE_TEXT = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\/\/\S+|\bwww\.|\b10\.\d{4,9}\/\S+|\b(?:\d{1,3}\.){3}\d{1,3}(?:[/:]\S*)?|\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?:\/\S*)?)/i
+const PROHIBITED_INSTITUTIONAL_CLAIM = /(?:\b(?:official(?:ly)?|approved|approval|endorsed|authorized)\b|\b(?:committee|tc\s*26)\b.{0,60}\b(?:position|policy|guidance|view|statement|consensus|agreed|agreement|adopted|concluded|determined)\b|\b(?:position|policy|guidance|view|statement|consensus|agreement)\b.{0,60}\b(?:committee|tc\s*26)\b)/i
 
 export const MAX_REQUEST_BODY_BYTES = 4_096
 export const OPENAI_TIMEOUT_MS = 8_000
@@ -77,7 +113,8 @@ const SYSTEM_INSTRUCTIONS = [
   'Distinguish direct evidence from interpretation and state when the supplied context is insufficient.',
   'Never invent an official committee position, consensus, policy, paper finding, or source.',
   'Do not claim to have read linked paper full text, and do not substitute your answer for the linked publications.',
-  'Return concise plain text without unsupported URLs or outside knowledge.'
+  'Do not include any URL in the answer and do not claim official status, approval, endorsement, or committee consensus.',
+  'Return a concise answer and select only publication slugs supplied in the bibliographic metadata.'
 ].join(' ')
 
 const NON_OFFICIAL_NOTICE =
@@ -87,6 +124,7 @@ const publicationBySlug = new Map<string, Publication>(
   publications.map((publication) => [publication.slug, publication])
 )
 const rateWindows = new Map<string, RateWindow>()
+let durableLimiterOverride: DurableLimiters | undefined
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -104,6 +142,13 @@ function getHeader(request: ApiRequest, name: string): string | undefined {
   return String(value)
 }
 
+function configuredAllowedOrigins(): string[] {
+  return (process.env.ALLOWED_ORIGIN ?? '')
+    .split(',')
+    .map((candidate) => candidate.trim())
+    .filter((candidate) => candidate.length > 0)
+}
+
 function setCommonHeaders(request: ApiRequest, response: ApiResponse): boolean {
   response.setHeader('Cache-Control', 'no-store')
   response.setHeader('Content-Type', 'application/json; charset=utf-8')
@@ -112,10 +157,7 @@ function setCommonHeaders(request: ApiRequest, response: ApiResponse): boolean {
   response.setHeader('Access-Control-Allow-Headers', 'Content-Type')
 
   const origin = getHeader(request, 'origin')
-  const allowedOrigins = (process.env.ALLOWED_ORIGIN ?? '')
-    .split(',')
-    .map((candidate) => candidate.trim())
-    .filter((candidate) => candidate.length > 0)
+  const allowedOrigins = configuredAllowedOrigins()
 
   if (allowedOrigins.length === 0) {
     response.setHeader('Access-Control-Allow-Origin', '*')
@@ -128,6 +170,29 @@ function setCommonHeaders(request: ApiRequest, response: ApiResponse): boolean {
 
   response.setHeader('Access-Control-Allow-Origin', origin)
   return true
+}
+
+function liveConfiguration(request: ApiRequest): LiveConfiguration | undefined {
+  if (process.env.ASK_LIVE_ENABLED !== 'true') return undefined
+
+  const apiKey = process.env.OPENAI_API_KEY?.trim()
+  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  const allowedOrigins = configuredAllowedOrigins()
+  const origin = getHeader(request, 'origin')
+
+  if (
+    !apiKey ||
+    !redisUrl ||
+    !redisToken ||
+    allowedOrigins.length === 0 ||
+    origin === undefined ||
+    !allowedOrigins.includes(origin)
+  ) {
+    return undefined
+  }
+
+  return { apiKey, redisUrl, redisToken }
 }
 
 function sendJson(response: ApiResponse, status: number, payload: unknown): void {
@@ -303,6 +368,91 @@ export function __getRateLimitSizeForTests(): number {
   return rateWindows.size
 }
 
+export function __setDurableLimitersForTests(
+  limiters: DurableLimiters
+): void {
+  durableLimiterOverride = limiters
+}
+
+export function __resetDurableLimitersForTests(): void {
+  durableLimiterOverride = undefined
+}
+
+function createDurableLimiters(
+  configuration: LiveConfiguration
+): DurableLimiters {
+  const redis = new Redis({
+    url: configuration.redisUrl,
+    token: configuration.redisToken
+  })
+
+  return {
+    ip: new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(LIVE_IP_LIMIT, LIVE_IP_WINDOW),
+      prefix: 'tc26-ask-live-ip',
+      timeout: 0,
+      ephemeralCache: false,
+      analytics: false
+    }),
+    global: new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(
+        LIVE_GLOBAL_LIMIT,
+        LIVE_GLOBAL_WINDOW
+      ),
+      prefix: 'tc26-ask-live-global',
+      timeout: 0,
+      ephemeralCache: false,
+      analytics: false
+    })
+  }
+}
+
+function acceptedDurableDecision(
+  decision: DurableDecision | undefined
+): boolean {
+  return decision?.success === true && decision.reason === undefined
+}
+
+async function boundedDurableDecision(
+  limiter: DurableLimiter,
+  identifier: string
+): Promise<DurableDecision | undefined> {
+  let timeout: ReturnType<typeof setTimeout> | undefined
+  const timeoutDecision = new Promise<undefined>((resolve) => {
+    timeout = setTimeout(() => resolve(undefined), DURABLE_LIMIT_TIMEOUT_MS)
+  })
+
+  try {
+    return await Promise.race([limiter.limit(identifier), timeoutDecision])
+  } catch {
+    return undefined
+  } finally {
+    if (timeout !== undefined) clearTimeout(timeout)
+  }
+}
+
+async function passDurableLiveLimits(
+  configuration: LiveConfiguration,
+  hashedIp: string
+): Promise<boolean> {
+  try {
+    const limiters =
+      durableLimiterOverride ?? createDurableLimiters(configuration)
+    const ipDecision = await boundedDurableDecision(limiters.ip, hashedIp)
+    if (!acceptedDurableDecision(ipDecision)) return false
+
+    const globalDecision = await boundedDurableDecision(
+      limiters.global,
+      LIVE_GLOBAL_IDENTIFIER
+    )
+    return acceptedDurableDecision(globalDecision)
+  } catch {
+    return false
+  }
+}
+
 function canonicalDoiUrl(publication: Publication): string | undefined {
   const href = doiUrl(publication.doi)
 
@@ -405,7 +555,7 @@ function extractOutputText(payload: unknown): string | undefined {
     const directOutput = payload.output_text.trim()
     if (
       directOutput.length > 0 &&
-      directOutput.length <= MAX_UPSTREAM_ANSWER_CHARACTERS
+      directOutput.length <= MAX_UPSTREAM_OUTPUT_CHARACTERS
     ) {
       return directOutput
     }
@@ -432,12 +582,86 @@ function extractOutputText(payload: unknown): string | undefined {
   const combinedOutput = outputBlocks.join('\n')
   if (
     combinedOutput.length === 0 ||
-    combinedOutput.length > MAX_UPSTREAM_ANSWER_CHARACTERS
+    combinedOutput.length > MAX_UPSTREAM_OUTPUT_CHARACTERS
   ) {
     return undefined
   }
 
   return combinedOutput
+}
+
+function validateOpenAiAnswer(
+  outputText: string,
+  sourcePublications: readonly Publication[]
+): ValidatedOpenAiAnswer | undefined {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(outputText)
+  } catch {
+    return undefined
+  }
+
+  if (!isRecord(parsed)) return undefined
+  const keys = Object.keys(parsed)
+  if (
+    keys.length !== 2 ||
+    !Object.hasOwn(parsed, 'answer') ||
+    !Object.hasOwn(parsed, 'sourceSlugs') ||
+    typeof parsed.answer !== 'string' ||
+    !Array.isArray(parsed.sourceSlugs)
+  ) {
+    return undefined
+  }
+
+  const answer = parsed.answer.trim()
+  const normalizedAnswer = answer.replace(/\s+/g, ' ')
+  if (
+    answer.length === 0 ||
+    answer.length > MAX_LIVE_ANSWER_CHARACTERS ||
+    URL_LIKE_TEXT.test(answer) ||
+    PROHIBITED_INSTITUTIONAL_CLAIM.test(normalizedAnswer)
+  ) {
+    return undefined
+  }
+
+  const allowedSlugs = new Set(
+    sourcePublications.map((publication) => publication.slug)
+  )
+  const sourceSlugs = parsed.sourceSlugs
+  if (
+    sourceSlugs.length === 0 ||
+    sourceSlugs.some(
+      (slug) => typeof slug !== 'string' || !allowedSlugs.has(slug)
+    ) ||
+    new Set(sourceSlugs).size !== sourceSlugs.length
+  ) {
+    return undefined
+  }
+
+  return { answer, sourceSlugs: sourceSlugs as string[] }
+}
+
+function structuredOutputFormat(sourcePublications: readonly Publication[]) {
+  return {
+    type: 'json_schema' as const,
+    name: 'source_bounded_answer',
+    strict: true,
+    schema: {
+      type: 'object',
+      properties: {
+        answer: { type: 'string' },
+        sourceSlugs: {
+          type: 'array',
+          items: {
+            type: 'string',
+            enum: sourcePublications.map((publication) => publication.slug)
+          }
+        }
+      },
+      required: ['answer', 'sourceSlugs'],
+      additionalProperties: false
+    }
+  }
 }
 
 async function fetchJsonWithTimeout(
@@ -476,7 +700,7 @@ async function requestOpenAiAnswer(
   results: readonly RetrievalResult[],
   sourcePublications: readonly Publication[],
   identifier: string
-): Promise<string | undefined> {
+): Promise<ValidatedOpenAiAnswer | undefined> {
   try {
     const response = await fetchJsonWithTimeout(
       'https://api.openai.com/v1/responses',
@@ -492,13 +716,18 @@ async function requestOpenAiAnswer(
           max_output_tokens: 450,
           instructions: SYSTEM_INSTRUCTIONS,
           input: buildGroundedInput(question, results, sourcePublications),
-          safety_identifier: identifier
+          safety_identifier: identifier,
+          text: {
+            format: structuredOutputFormat(sourcePublications)
+          }
         })
       }
     )
 
     if (!response.ok) return undefined
-    return extractOutputText(response.payload)
+    const outputText = extractOutputText(response.payload)
+    if (outputText === undefined) return undefined
+    return validateOpenAiAnswer(outputText, sourcePublications)
   } catch {
     return undefined
   }
@@ -543,7 +772,8 @@ export default async function handler(
 
   const identity = clientIdentity(request)
   const identifier = safetyIdentifier(identity)
-  const rateLimit = consumeRateLimit(rateLimitIdentifier(identity), Date.now())
+  const hashedIp = rateLimitIdentifier(identity)
+  const rateLimit = consumeRateLimit(hashedIp, Date.now())
   setRateLimitHeaders(response, rateLimit)
   if (!rateLimit.allowed) {
     sendJson(response, 429, {
@@ -587,14 +817,28 @@ export default async function handler(
     return
   }
 
-  const apiKey = process.env.OPENAI_API_KEY?.trim()
-  if (!apiKey) {
+  const liveConfig = liveConfiguration(request)
+  if (
+    liveConfig === undefined ||
+    sourcePublications.length === 0 ||
+    sources.length === 0
+  ) {
     sendJson(response, 200, previewPayload(results, sources, 'no-key'))
     return
   }
 
+  const liveLimitsPassed = await passDurableLiveLimits(liveConfig, hashedIp)
+  if (!liveLimitsPassed) {
+    sendJson(
+      response,
+      200,
+      previewPayload(results, sources, 'live-unavailable')
+    )
+    return
+  }
+
   const openAiAnswer = await requestOpenAiAnswer(
-    apiKey,
+    liveConfig.apiKey,
     question,
     results,
     sourcePublications,
@@ -609,10 +853,24 @@ export default async function handler(
     return
   }
 
+  const answerPublications = openAiAnswer.sourceSlugs.flatMap((slug) => {
+    const publication = publicationBySlug.get(slug)
+    return publication === undefined ? [] : [publication]
+  })
+  const answerSources = sourcesForPublications(answerPublications)
+  if (answerSources.length !== openAiAnswer.sourceSlugs.length) {
+    sendJson(
+      response,
+      200,
+      previewPayload(results, sources, 'live-unavailable')
+    )
+    return
+  }
+
   sendJson(response, 200, {
-    answer: openAiAnswer,
+    answer: openAiAnswer.answer,
     mode: 'openai',
-    sources,
+    sources: answerSources,
     notice: `OpenAI-assisted answer grounded in site-owned public context. ${NON_OFFICIAL_NOTICE}`
   } satisfies AskPayload)
 }

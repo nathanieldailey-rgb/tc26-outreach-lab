@@ -11,6 +11,8 @@
     "test:e2e": "playwright test"
   },
   "dependencies": {
+    "@upstash/ratelimit": "2.0.8",
+    "@upstash/redis": "1.38.3",
     "react": "19.2.8",
     "react-dom": "19.2.8"
   },

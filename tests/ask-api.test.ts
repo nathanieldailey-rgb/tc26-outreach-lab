@@ -682,7 +682,7 @@ describe('live OpenAI request and output contract', () => {
       mode: 'openai',
       sources: [
         {
-          title: 'Risk assessment of space objects reentries',
+          title: 'Hazards associated with reentry',
           href: 'https://doi.org/10.1016/j.actaastro.2024.10.040'
         }
       ],
@@ -780,9 +780,16 @@ describe('live OpenAI request and output contract', () => {
     ['an extra property', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['stm-outreach'], url: 'hidden' })],
     ['a URL', JSON.stringify({ answer: 'Read https://evil.example now.', sourceSlugs: ['stm-outreach'] })],
     ['a bare web address', JSON.stringify({ answer: 'Read www.evil.example now.', sourceSlugs: ['stm-outreach'] })],
+    ['a protocol-relative IP address', JSON.stringify({ answer: 'Read //198.51.100.2/path now.', sourceSlugs: ['stm-outreach'] })],
     ['an official-position claim', JSON.stringify({ answer: 'This is the official committee position.', sourceSlugs: ['stm-outreach'] })],
+    ['a general official-status claim', JSON.stringify({ answer: 'This answer is official.', sourceSlugs: ['stm-outreach'] })],
     ['an approval claim', JSON.stringify({ answer: 'The committee approved this conclusion.', sourceSlugs: ['stm-outreach'] })],
-    ['a consensus claim', JSON.stringify({ answer: 'Committee consensus supports this result.', sourceSlugs: ['stm-outreach'] })]
+    ['a general approval claim', JSON.stringify({ answer: 'This conclusion has been approved.', sourceSlugs: ['stm-outreach'] })],
+    ['a consensus claim', JSON.stringify({ answer: 'Committee consensus supports this result.', sourceSlugs: ['stm-outreach'] })],
+    ['a TC 26 consensus claim', JSON.stringify({ answer: 'TC 26 reached consensus on this result.', sourceSlugs: ['stm-outreach'] })],
+    ['a committee-position attribution', JSON.stringify({ answer: "The committee's position is that outreach matters.", sourceSlugs: ['stm-outreach'] })],
+    ['a TC 26 policy attribution', JSON.stringify({ answer: 'TC 26 policy requires this approach.', sourceSlugs: ['stm-outreach'] })],
+    ['a multiline committee-guidance attribution', JSON.stringify({ answer: 'The committee\nguidance establishes this result.', sourceSlugs: ['stm-outreach'] })]
   ])('rejects structured output containing %s', async (_case, outputText) => {
     installSuccessfulOpenAi({ output_text: outputText })
 
@@ -820,6 +827,27 @@ describe('live OpenAI request and output contract', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(JSON.stringify(result.body)).not.toContain('private durable credential detail')
     expect(JSON.stringify(result.body)).not.toContain('durable-test-token')
+  })
+
+  it.each(['ip', 'global'] as const)('times out a never-settling durable %s limiter to preview', async (limiterName) => {
+    vi.useFakeTimers()
+    const { ipLimit, globalLimit } = enableLiveMode()
+    const selected = limiterName === 'ip' ? ipLimit : globalLimit
+    selected.mockImplementationOnce(() => new Promise(() => undefined))
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+
+    let settledResult: Invocation | undefined
+    void invoke().then((result) => {
+      settledResult = result
+    })
+    await Promise.resolve()
+    await vi.advanceTimersByTimeAsync(2_001)
+    await Promise.resolve()
+
+    expect(settledResult).toBeDefined()
+    expectPreviewFallback(settledResult as Invocation)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('does not let an adversarial prompt bypass strict retrieval or reach OpenAI', async () => {

@@ -170,6 +170,20 @@ export default function AskCommittee({
 
       <div className="committee-query__workspace" aria-busy={isBusy}>
         <form onSubmit={handleSubmit} noValidate>
+          <div
+            className="submission-notice"
+            role="note"
+            aria-labelledby="question-data-notice-title"
+            id="question-data-notice"
+          >
+            <h3 id="question-data-notice-title">Before you submit</h3>
+            <p>
+              Live mode may send your question, public site context, and a
+              pseudonymous safety identifier to OpenAI. Do not submit personal,
+              confidential, controlled, or proprietary information. <code>store:false</code>{' '}
+              does not promise zero abuse-monitoring retention.
+            </p>
+          </div>
           <label htmlFor="committee-question">Your question</label>
           <textarea
             id="committee-question"
@@ -180,7 +194,7 @@ export default function AskCommittee({
               onQuestionChange(event.target.value)
               if (validationError) setValidationError('')
             }}
-            aria-describedby="question-guidance question-count question-validation"
+            aria-describedby="question-data-notice question-guidance question-count question-validation"
             aria-invalid={validationError ? 'true' : 'false'}
             rows={4}
           />

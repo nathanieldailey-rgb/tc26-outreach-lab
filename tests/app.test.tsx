@@ -370,7 +370,7 @@ describe('editorial application', () => {
     ).toBeTruthy()
     expect(question).toHaveAttribute(
       'aria-describedby',
-      expect.stringContaining('ask-data-notice')
+      expect.stringContaining('question-data-notice')
     )
   })
 
