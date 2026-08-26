@@ -1,0 +1,78 @@
+name: Feature request
+description: Propose a reader, contributor, editorial, accessibility, or Ask improvement.
+title: "Feature: "
+labels:
+  - enhancement
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Start with the reader or contributor problem. A proposed solution is welcome, but the outcome matters more than a particular implementation.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What is difficult, unclear, inaccessible, or missing today?
+    validations:
+      required: true
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Affected audience
+      options:
+        - Public reader
+        - Student or educator
+        - Operator or practitioner
+        - Policy or regulatory reader
+        - Working-group contributor
+        - Committee reviewer
+        - Multiple audiences
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Desired outcome
+      description: Describe what a person should be able to understand or do.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed feature
+      description: Outline the smallest useful change and any alternatives considered.
+    validations:
+      required: true
+  - type: textarea
+    id: accessibility
+    attributes:
+      label: Accessibility considerations
+      description: Note keyboard, screen-reader, contrast, motion, captions, transcript, reflow, or language needs.
+    validations:
+      required: true
+  - type: textarea
+    id: privacy_ai
+    attributes:
+      label: Privacy, AI, hosting, or recurring-cost implications
+      description: Identify any new data, external service, model, secret, durable storage, moderation, or ongoing cost.
+    validations:
+      required: true
+  - type: dropdown
+    id: implementation
+    attributes:
+      label: Implementation interest
+      options:
+        - I can open a pull request
+        - I can help with review or testing
+        - I am proposing the need only
+    validations:
+      required: true
+  - type: checkboxes
+    id: boundaries
+    attributes:
+      label: Public-repository boundaries
+      options:
+        - label: This request contains no secrets, private hosts, personal paths, subscription content, or unapproved marks.
+          required: true
+        - label: I understand that acceptance does not make the feature an official committee capability.
+          required: true

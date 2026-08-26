@@ -1,0 +1,97 @@
+name: Article pitch
+description: Propose an original public-facing article grounded in DOI-linked committee research.
+title: "Article pitch: "
+labels:
+  - article-pitch
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for proposing an outreach article. Do not paste publisher abstracts, full papers, subscription text, or copied figures into this form.
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Primary audience
+      description: Who should understand or act differently after reading?
+      options:
+        - General public
+        - Students and educators
+        - Operators and practitioners
+        - Policy and regulatory community
+        - Research community
+        - Mixed audience
+    validations:
+      required: true
+  - type: textarea
+    id: central_question
+    attributes:
+      label: Central question
+      description: State the one plain-language question the article will answer.
+      placeholder: Why does this part of space traffic management matter?
+    validations:
+      required: true
+  - type: textarea
+    id: reader_outcome
+    attributes:
+      label: Reader outcome and proposed approach
+      description: Describe the story, intended takeaway, and distinction between evidence and interpretation.
+    validations:
+      required: true
+  - type: input
+    id: author
+    attributes:
+      label: Proposed author or contributors
+      description: Name the people responsible for the pitch and human review.
+    validations:
+      required: true
+  - type: textarea
+    id: source_links
+    attributes:
+      label: DOI and official source links
+      description: List canonical DOI links and any other public authoritative sources. Links only; do not paste source text.
+    validations:
+      required: true
+  - type: dropdown
+    id: source_version
+    attributes:
+      label: Source version
+      description: Identify the version actually reviewed.
+      options:
+        - Version-of-record metadata and DOI landing page only
+        - Licensed open version with exact license recorded below
+        - Author manuscript with written reuse permission recorded below
+        - Public official source outside the journals
+        - Rights status needs review before drafting
+    validations:
+      required: true
+  - type: textarea
+    id: rights
+    attributes:
+      label: Rights, license, or permission
+      description: Identify what is project-original and document the exact license or written permission for every other element.
+    validations:
+      required: true
+  - type: dropdown
+    id: ai_assistance
+    attributes:
+      label: AI assistance
+      description: Disclose whether AI assisted research, drafting, translation, images, audio, or code.
+      options:
+        - None
+        - Yes - details and human review will be documented
+        - Undecided - review required before work begins
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmations
+    attributes:
+      label: Rights and contribution confirmations
+      options:
+        - label: I will not submit publisher abstracts, full text, subscription material, copied figures, or unapproved marks.
+          required: true
+        - label: I control the submitted material or will document its exact license or permission.
+          required: true
+        - label: I accept the editorial contribution grant in CONTENT_POLICY.md for material I submit.
+          required: true
+        - label: I understand that this prototype is not an official or endorsed committee publication.
+          required: true
