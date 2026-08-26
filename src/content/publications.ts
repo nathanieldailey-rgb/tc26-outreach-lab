@@ -1,10 +1,27 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+export const topicClusters = [
+  'Foundations',
+  'Orbital Knowledge',
+  'Operations',
+  'Governance',
+  'Future Domains'
+] as const
 
-import { articles } from '../src/content/articles'
-import { doiUrl, publications } from '../src/content/publications'
+export type TopicCluster = (typeof topicClusters)[number]
 
-const expectedPublications = [
+export type Publication = {
+  slug: string
+  sequence: number | 'S'
+  title: string
+  journal: 'Acta Astronautica' | 'Journal of Space Safety Engineering'
+  volume: string
+  year: number
+  pages: string
+  doi: string
+  cluster: TopicCluster
+  kind: 'topic-report' | 'synthesis'
+}
+
+export const publications = [
   {
     slug: 'stm-terminology',
     sequence: 1,
@@ -257,72 +274,8 @@ const expectedPublications = [
     cluster: 'Foundations',
     kind: 'synthesis'
   }
-]
+] as const satisfies readonly Publication[]
 
-describe('public publication metadata', () => {
-  it('contains the exact 19 topic reports and one synthesis record', () => {
-    expect(publications).toEqual(expectedPublications)
-    expect(publications).toHaveLength(20)
-    expect(publications.filter(({ kind }) => kind === 'topic-report')).toHaveLength(19)
-    expect(publications.filter(({ kind }) => kind === 'synthesis')).toHaveLength(1)
-  })
-
-  it('uses unique DOI values and canonical HTTPS DOI links', () => {
-    const dois = publications.map(({ doi }) => doi)
-
-    expect(new Set(dois).size).toBe(20)
-    for (const doi of dois) {
-      expect(doiUrl(doi)).toBe(`https://doi.org/${doi}`)
-    }
-  })
-})
-
-describe('project-original outreach articles', () => {
-  it('provides three bounded articles with one featured story', () => {
-    expect(articles).toHaveLength(3)
-    expect(articles.filter(({ featured }) => featured)).toHaveLength(1)
-    expect(articles.find(({ featured }) => featured)?.title).toBe(
-      'Outreach is part of the safety architecture'
-    )
-
-    for (const article of articles) {
-      expect(article.provenance).toBe('project-original')
-      expect(article.notice).toMatch(/not (?:a substitute|substitutes) for/i)
-      expect(article.deck.length).toBeGreaterThan(20)
-      expect(article.audience.length).toBeGreaterThan(0)
-      expect(article.readingMinutes).toBeGreaterThan(0)
-      expect(article.body.length).toBeGreaterThanOrEqual(2)
-    }
-  })
-
-  it('resolves every article source to a publication slug', () => {
-    const publicationSlugs = new Set<string>(publications.map(({ slug }) => slug))
-
-    for (const sourceSlug of articles.flatMap(({ sourceSlugs }) => sourceSlugs)) {
-      expect(publicationSlugs.has(sourceSlug)).toBe(true)
-    }
-  })
-})
-
-describe('clean-room public source boundary', () => {
-  it('contains no employer marker, local absolute path, credential, or source-control remote', () => {
-    const projectFiles = [
-      'src/content/publications.ts',
-      'src/content/articles.ts',
-      'src/content/knowledge.ts',
-      'src/lib/retrieval.ts'
-    ]
-    const publicSource = projectFiles
-      .map((file) => readFileSync(resolve(process.cwd(), file), 'utf8'))
-      .join('\n')
-    const employerMarker = String.fromCharCode(109, 105, 116, 114, 101)
-    const localUserRoot = ['/', 'Users', '/'].join('')
-
-    expect(publicSource.toLowerCase()).not.toContain(employerMarker)
-    expect(publicSource).not.toContain(localUserRoot)
-    expect(publicSource).not.toMatch(/(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/)
-    expect(publicSource).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/)
-    expect(publicSource).not.toMatch(/https?:\/\/(?:[^/]+\.)?git(?:hub|lab)\./i)
-    expect(publicSource).not.toMatch(/(?:abstract|fullText)\s*:/)
-  })
-})
+export function doiUrl(doi: string): string {
+  return `https://doi.org/${doi}`
+}
