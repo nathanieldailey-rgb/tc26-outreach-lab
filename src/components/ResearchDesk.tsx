@@ -1,16 +1,23 @@
 import { type FormEvent, useRef, useState } from 'react'
 
 type ResearchDeskProps = {
+  isAskBusy: boolean
   onStartQuestion: (question: string) => void
 }
 
-export default function ResearchDesk({ onStartQuestion }: ResearchDeskProps) {
+export default function ResearchDesk({
+  isAskBusy,
+  onStartQuestion
+}: ResearchDeskProps) {
   const [draft, setDraft] = useState('')
   const [validationError, setValidationError] = useState('')
   const questionInput = useRef<HTMLInputElement>(null)
 
   const submitQuestionStarter = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (isAskBusy) return
+
     const question = draft.trim()
 
     if (!question) {
@@ -47,14 +54,18 @@ export default function ResearchDesk({ onStartQuestion }: ResearchDeskProps) {
               type="text"
               value={draft}
               maxLength={500}
+              disabled={isAskBusy}
               aria-describedby="starter-guidance starter-validation"
               aria-invalid={validationError ? 'true' : 'false'}
               onChange={(event) => {
+                if (isAskBusy) return
                 setDraft(event.target.value)
                 if (validationError) setValidationError('')
               }}
             />
-            <button type="submit">Take this question to Ask</button>
+            <button type="submit" disabled={isAskBusy}>
+              Take this question to Ask
+            </button>
           </div>
           <p id="starter-guidance">
             Draft here, then continue to the full source-bounded question workspace.

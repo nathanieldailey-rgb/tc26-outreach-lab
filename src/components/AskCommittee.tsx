@@ -1,4 +1,4 @@
-import { type FormEvent, useState } from 'react'
+import { type FormEvent, useRef, useState } from 'react'
 
 export type AskResponse = {
   answer: string
@@ -16,7 +16,40 @@ const sampleQuestions = [
 
 type AskCommitteeProps = {
   question: string
+  isBusy: boolean
+  onBusyChange: (isBusy: boolean) => void
   onQuestionChange: (question: string) => void
+}
+
+type AnswerRecord = {
+  response: AskResponse
+  submittedQuestion: string
+}
+
+function hasVisibleText(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0
+}
+
+function isCanonicalDoiUrl(value: unknown): value is string {
+  if (typeof value !== 'string' || !value.startsWith('https://doi.org/')) return false
+
+  try {
+    const url = new URL(value)
+    const decodedPath = decodeURIComponent(url.pathname)
+
+    return (
+      url.protocol === 'https:' &&
+      url.hostname === 'doi.org' &&
+      url.username === '' &&
+      url.password === '' &&
+      url.port === '' &&
+      url.search === '' &&
+      url.hash === '' &&
+      /^\/10\.\d{4,9}\/[^\s]+$/i.test(decodedPath)
+    )
+  } catch {
+    return false
+  }
 }
 
 function isAskResponse(value: unknown): value is AskResponse {
@@ -24,31 +57,35 @@ function isAskResponse(value: unknown): value is AskResponse {
 
   const candidate = value as Partial<AskResponse>
   return (
-    typeof candidate.answer === 'string' &&
+    hasVisibleText(candidate.answer) &&
     (candidate.mode === 'preview' || candidate.mode === 'openai') &&
     Array.isArray(candidate.sources) &&
     candidate.sources.every(
       (source) =>
         source !== null &&
         typeof source === 'object' &&
-        typeof source.title === 'string' &&
-        typeof source.href === 'string'
+        hasVisibleText(source.title) &&
+        isCanonicalDoiUrl(source.href)
     ) &&
-    typeof candidate.notice === 'string'
+    hasVisibleText(candidate.notice)
   )
 }
 
 export default function AskCommittee({
   question,
+  isBusy,
+  onBusyChange,
   onQuestionChange
 }: AskCommitteeProps) {
   const [status, setStatus] = useState('Ready for a question.')
   const [validationError, setValidationError] = useState('')
   const [requestError, setRequestError] = useState('')
-  const [answer, setAnswer] = useState<AskResponse | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
+  const [answer, setAnswer] = useState<AnswerRecord | null>(null)
+  const requestInFlight = useRef(false)
 
   const chooseSample = (sample: string) => {
+    if (isBusy) return
+
     onQuestionChange(sample)
     setValidationError('')
     setRequestError('')
@@ -57,6 +94,9 @@ export default function AskCommittee({
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (isBusy || requestInFlight.current) return
+
     const boundedQuestion = question.trim()
 
     setAnswer(null)
@@ -75,7 +115,8 @@ export default function AskCommittee({
     }
 
     setValidationError('')
-    setIsLoading(true)
+    requestInFlight.current = true
+    onBusyChange(true)
     setStatus('Researching the public record…')
 
     try {
@@ -91,10 +132,14 @@ export default function AskCommittee({
 
       const payload: unknown = await response.json()
       if (!isAskResponse(payload)) {
-        throw new Error('Ask response did not match the public response contract')
+        setRequestError(
+          'The Ask response was rejected because its content or source links did not meet the public trust contract. No answer or source link was rendered.'
+        )
+        setStatus('Response rejected. No untrusted content was rendered.')
+        return
       }
 
-      setAnswer(payload)
+      setAnswer({ response: payload, submittedQuestion: boundedQuestion })
       setStatus('Answer ready. Sources and mode are shown below.')
     } catch {
       setRequestError(
@@ -102,7 +147,8 @@ export default function AskCommittee({
       )
       setStatus('Request could not be completed. No answer was generated.')
     } finally {
-      setIsLoading(false)
+      requestInFlight.current = false
+      onBusyChange(false)
     }
   }
 
@@ -122,13 +168,15 @@ export default function AskCommittee({
         </p>
       </div>
 
-      <div className="committee-query__workspace">
+      <div className="committee-query__workspace" aria-busy={isBusy}>
         <form onSubmit={handleSubmit} noValidate>
           <label htmlFor="committee-question">Your question</label>
           <textarea
             id="committee-question"
             value={question}
+            disabled={isBusy}
             onChange={(event) => {
+              if (isBusy) return
               onQuestionChange(event.target.value)
               if (validationError) setValidationError('')
             }}
@@ -148,10 +196,10 @@ export default function AskCommittee({
           <button
             className="button button--primary"
             type="submit"
-            disabled={isLoading}
+            disabled={isBusy}
             aria-label="Ask this question"
           >
-            {isLoading ? 'Researching…' : 'Ask this question'}
+            {isBusy ? 'Researching…' : 'Ask this question'}
           </button>
         </form>
 
@@ -159,7 +207,12 @@ export default function AskCommittee({
           <p>Try a question</p>
           <div>
             {sampleQuestions.map((sample) => (
-              <button type="button" key={sample} onClick={() => chooseSample(sample)}>
+              <button
+                type="button"
+                key={sample}
+                disabled={isBusy}
+                onClick={() => chooseSample(sample)}
+              >
                 {sample}
               </button>
             ))}
@@ -175,19 +228,23 @@ export default function AskCommittee({
         {answer ? (
           <article className="answer" aria-labelledby="answer-title">
             <header>
-              <p className={`mode-label mode-label--${answer.mode}`}>
-                {answer.mode === 'preview'
+              <p className={`mode-label mode-label--${answer.response.mode}`}>
+                {answer.response.mode === 'preview'
                   ? 'Deterministic preview mode'
                   : 'OpenAI-assisted mode'}
               </p>
               <h3 id="answer-title">Response from the public record</h3>
             </header>
-            <p className="answer__text">{answer.answer}</p>
-            {answer.sources.length > 0 ? (
+            <div className="answer__question">
+              <p>Question submitted</p>
+              <blockquote>{answer.submittedQuestion}</blockquote>
+            </div>
+            <p className="answer__text">{answer.response.answer}</p>
+            {answer.response.sources.length > 0 ? (
               <div className="answer__sources">
                 <h4>Sources used</h4>
                 <ol>
-                  {answer.sources.map((source) => (
+                  {answer.response.sources.map((source) => (
                     <li key={`${source.href}-${source.title}`}>
                       <a href={source.href} target="_blank" rel="noopener noreferrer">
                         {source.title} <span aria-hidden="true">↗</span>
@@ -197,7 +254,7 @@ export default function AskCommittee({
                 </ol>
               </div>
             ) : null}
-            <p className="answer__notice">{answer.notice}</p>
+            <p className="answer__notice">{answer.response.notice}</p>
           </article>
         ) : null}
       </div>

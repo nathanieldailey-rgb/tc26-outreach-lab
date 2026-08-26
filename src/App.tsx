@@ -10,8 +10,11 @@ import ResearchDesk from './components/ResearchDesk'
 
 export default function App() {
   const [question, setQuestion] = useState('')
+  const [isAskBusy, setIsAskBusy] = useState(false)
 
   const moveQuestionToAsk = (draft: string) => {
+    if (isAskBusy) return
+
     setQuestion(draft)
 
     const askSection = document.getElementById('ask')
@@ -25,9 +28,17 @@ export default function App() {
     <>
       <Header />
       <main id="main-content">
-        <ResearchDesk onStartQuestion={moveQuestionToAsk} />
+        <ResearchDesk
+          isAskBusy={isAskBusy}
+          onStartQuestion={moveQuestionToAsk}
+        />
         <ArticleFeature />
-        <AskCommittee question={question} onQuestionChange={setQuestion} />
+        <AskCommittee
+          question={question}
+          isBusy={isAskBusy}
+          onBusyChange={setIsAskBusy}
+          onQuestionChange={setQuestion}
+        />
         <PublicationLibrary />
         <ExplainerStudio />
         <Contribute />
