@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs'
-import { resolve } from 'node:path'
+import { readdirSync, readFileSync } from 'node:fs'
+import { relative, resolve } from 'node:path'
 
 import { articles } from '../src/content/articles'
 import { knowledgeEntries } from '../src/content/knowledge'
@@ -11,6 +11,36 @@ function bodyWordCount(paragraphs: readonly string[]): number {
       .join(' ')
       .match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)?.length ?? 0
   )
+}
+
+const publicScanExclusions = new Map([
+  ['.git', 'version-control metadata'],
+  ['node_modules', 'installed third-party dependencies'],
+  ['dist', 'generated build output'],
+  ['coverage', 'generated coverage output'],
+  ['package-lock.json', 'generated third-party lock metadata']
+])
+
+function collectPublicSourceFiles(directory: string): string[] {
+  return readdirSync(directory, { withFileTypes: true })
+    .sort((left, right) => left.name.localeCompare(right.name))
+    .flatMap((entry) => {
+      if (publicScanExclusions.has(entry.name)) {
+        return []
+      }
+
+      const entryPath = resolve(directory, entry.name)
+
+      if (entry.isDirectory()) {
+        return collectPublicSourceFiles(entryPath)
+      }
+
+      if (!entry.isFile()) {
+        throw new Error(`Unsupported repository entry: ${entry.name}`)
+      }
+
+      return [entryPath]
+    })
 }
 
 const expectedPublications = [
@@ -332,24 +362,87 @@ describe('site-owned knowledge sources', () => {
 })
 
 describe('clean-room public source boundary', () => {
-  it('contains no employer marker, local absolute path, credential, or source-control remote', () => {
-    const projectFiles = [
-      'src/content/publications.ts',
-      'src/content/articles.ts',
-      'src/content/knowledge.ts',
-      'src/lib/retrieval.ts'
-    ]
-    const publicSource = projectFiles
-      .map((file) => readFileSync(resolve(process.cwd(), file), 'utf8'))
-      .join('\n')
+  it('recursively scans the public repository surface with explicit generated-data exclusions', () => {
+    const projectRoot = process.cwd()
+    const projectFiles = collectPublicSourceFiles(projectRoot)
+    const relativeFiles = projectFiles.map((file) => relative(projectRoot, file))
     const employerMarker = String.fromCharCode(109, 105, 116, 114, 101)
-    const localUserRoot = ['/', 'Users', '/'].join('')
+    const localRoots = [
+      ['/', 'Users', '/'].join(''),
+      ['/', 'home', '/'].join(''),
+      ['C:', '\\', 'Users', '\\'].join('')
+    ]
 
-    expect(publicSource.toLowerCase()).not.toContain(employerMarker)
-    expect(publicSource).not.toContain(localUserRoot)
-    expect(publicSource).not.toMatch(/(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/)
-    expect(publicSource).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/)
-    expect(publicSource).not.toMatch(/https?:\/\/(?:[^/]+\.)?git(?:hub|lab)\./i)
-    expect(publicSource).not.toMatch(/(?:abstract|fullText)\s*:/)
+    expect(relativeFiles).toEqual(
+      expect.arrayContaining([
+        'docs/superpowers/specs/2026-08-26-tc26-outreach-lab-design.md',
+        'index.html',
+        'package.json',
+        'src/content/articles.ts',
+        'tests/content.test.ts',
+        'tests/retrieval.test.ts',
+        'vite.config.ts'
+      ])
+    )
+    expect(relativeFiles).not.toContain('package-lock.json')
+
+    for (const file of projectFiles) {
+      const source = readFileSync(file, 'utf8')
+      const fileLabel = relative(projectRoot, file)
+
+      expect(source.toLowerCase(), fileLabel).not.toContain(employerMarker)
+      for (const localRoot of localRoots) {
+        expect(source, fileLabel).not.toContain(localRoot)
+      }
+      expect(source, fileLabel).not.toMatch(/(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/)
+      expect(source, fileLabel).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/)
+      expect(source, fileLabel).not.toMatch(
+        /https?:\/\/(?:[^/]+\.)?git(?:hub|lab)\./i
+      )
+      expect(source, fileLabel).not.toMatch(/(?:abstract|fullText)\s*:/)
+    }
+  })
+})
+
+describe('repository dependency contract', () => {
+  it('pins every declared dependency to its exact installed lockfile version', () => {
+    const projectRoot = process.cwd()
+    const manifest = JSON.parse(
+      readFileSync(resolve(projectRoot, 'package.json'), 'utf8')
+    ) as {
+      dependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const lockfile = JSON.parse(
+      readFileSync(resolve(projectRoot, 'package-lock.json'), 'utf8')
+    ) as {
+      packages: Record<
+        string,
+        {
+          version?: string
+          dependencies?: Record<string, string>
+          devDependencies?: Record<string, string>
+        }
+      >
+    }
+    const declaredDependencies = {
+      ...manifest.dependencies,
+      ...manifest.devDependencies
+    }
+    const lockedRootDependencies = {
+      ...lockfile.packages[''].dependencies,
+      ...lockfile.packages[''].devDependencies
+    }
+
+    expect(lockedRootDependencies).toEqual(declaredDependencies)
+
+    for (const [name, version] of Object.entries(declaredDependencies)) {
+      const installedVersion = lockfile.packages[`node_modules/${name}`]?.version
+
+      expect.soft(installedVersion, `${name} missing from lockfile`).toBeTypeOf('string')
+      expect.soft(version, `${name} must use its exact installed version`).toBe(
+        installedVersion
+      )
+    }
   })
 })

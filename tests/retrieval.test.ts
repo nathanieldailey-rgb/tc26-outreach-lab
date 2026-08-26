@@ -1,7 +1,13 @@
-import {
-  composePreviewAnswer,
-  retrieveKnowledge
-} from '../src/lib/retrieval'
+import { knowledgeEntries } from '../src/content/knowledge'
+import * as retrieval from '../src/lib/retrieval'
+
+const { composePreviewAnswer, retrieveKnowledge } = retrieval
+const insufficientPreview =
+  'Preview limitation: The public project knowledge base does not contain enough information to answer this question. Consult the linked publication records or ask a committee reviewer.'
+
+type SourceCollector = (
+  entries: readonly { readonly sourceSlugs: readonly string[] }[]
+) => string[]
 
 describe('knowledge retrieval', () => {
   it('returns no results for an empty or stopword-only query', () => {
@@ -18,6 +24,16 @@ describe('knowledge retrieval', () => {
     expect(retrieveKnowledge(question)[0]?.slug).toBe(expectedSlug)
   })
 
+  it.each([
+    'What is the space weather forecast?',
+    'How do I bake a space-themed cake?'
+  ])('rejects generic-overlap questions outside the public knowledge domain: %s', (question) => {
+    const results = retrieveKnowledge(question)
+
+    expect(results).toEqual([])
+    expect(composePreviewAnswer(results)).toBe(insufficientPreview)
+  })
+
   it('honors the result limit and gives tied scores a stable order', () => {
     const first = retrieveKnowledge('space traffic management', 2)
     const second = retrieveKnowledge('space traffic management', 2)
@@ -27,12 +43,36 @@ describe('knowledge retrieval', () => {
     expect(retrieveKnowledge('space', 0)).toEqual([])
   })
 
-  it('de-duplicates publication sources across ranked results', () => {
+  it('preserves each ranked entry\'s complete declared source provenance', () => {
     const results = retrieveKnowledge('outreach committee mission', 5)
-    const sources = results.flatMap(({ sourceSlugs }) => sourceSlugs)
+    const declaredBySlug = new Map(
+      knowledgeEntries.map((entry) => [entry.slug, entry.sourceSlugs])
+    )
 
-    expect(sources.length).toBeGreaterThan(0)
-    expect(new Set(sources).size).toBe(sources.length)
+    expect(results.length).toBeGreaterThan(1)
+    for (const result of results) {
+      expect(result.sourceSlugs).toEqual(declaredBySlug.get(result.slug))
+    }
+  })
+
+  it('exports a deterministic stable aggregate source de-duplication helper', () => {
+    const collectSourceSlugs = Reflect.get(
+      retrieval,
+      'collectSourceSlugs'
+    ) as SourceCollector | undefined
+
+    expect.soft(collectSourceSlugs).toBeTypeOf('function')
+    if (!collectSourceSlugs) {
+      return
+    }
+
+    expect(
+      collectSourceSlugs([
+        { sourceSlugs: ['report-a', 'report-b', 'report-a'] },
+        { sourceSlugs: ['report-b', 'report-c'] },
+        { sourceSlugs: [] }
+      ])
+    ).toEqual(['report-a', 'report-b', 'report-c'])
   })
 })
 
@@ -49,9 +89,20 @@ describe('deterministic preview composition', () => {
     expect(first).toContain('does not substitute for the linked papers')
   })
 
+  it('de-duplicates sources only in final preview citation composition', () => {
+    const results = retrieveKnowledge('outreach committee mission', 5)
+    const preview = composePreviewAnswer(results)
+
+    expect(results.flatMap(({ sourceSlugs }) => sourceSlugs)).toEqual([
+      'stm-outreach',
+      'synthesis-report',
+      'stm-outreach',
+      'synthesis-report'
+    ])
+    expect(preview).toContain('Source records: stm-outreach, synthesis-report.')
+  })
+
   it('labels insufficient public context without inventing an answer', () => {
-    expect(composePreviewAnswer([])).toBe(
-      'Preview limitation: The public project knowledge base does not contain enough information to answer this question. Consult the linked publication records or ask a committee reviewer.'
-    )
+    expect(composePreviewAnswer([])).toBe(insufficientPreview)
   })
 })
