@@ -2,7 +2,16 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import { articles } from '../src/content/articles'
+import { knowledgeEntries } from '../src/content/knowledge'
 import { doiUrl, publications } from '../src/content/publications'
+
+function bodyWordCount(paragraphs: readonly string[]): number {
+  return (
+    paragraphs
+      .join(' ')
+      .match(/[\p{L}\p{N}]+(?:[’'-][\p{L}\p{N}]+)*/gu)?.length ?? 0
+  )
+}
 
 const expectedPublications = [
   {
@@ -299,6 +308,24 @@ describe('project-original outreach articles', () => {
     const publicationSlugs = new Set<string>(publications.map(({ slug }) => slug))
 
     for (const sourceSlug of articles.flatMap(({ sourceSlugs }) => sourceSlugs)) {
+      expect(publicationSlugs.has(sourceSlug)).toBe(true)
+    }
+  })
+
+  it('provides substantial four-minute features in readable paragraphs', () => {
+    for (const article of articles) {
+      expect.soft(article.body.length, article.title).toBeGreaterThanOrEqual(5)
+      expect.soft(article.body.length, article.title).toBeLessThanOrEqual(8)
+      expect.soft(bodyWordCount(article.body), article.title).toBeGreaterThanOrEqual(500)
+    }
+  })
+})
+
+describe('site-owned knowledge sources', () => {
+  it('resolves every nonempty knowledge source to a publication slug', () => {
+    const publicationSlugs = new Set<string>(publications.map(({ slug }) => slug))
+
+    for (const sourceSlug of knowledgeEntries.flatMap(({ sourceSlugs }) => sourceSlugs)) {
       expect(publicationSlugs.has(sourceSlug)).toBe(true)
     }
   })
