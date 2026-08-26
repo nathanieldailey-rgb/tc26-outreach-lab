@@ -8,6 +8,90 @@ import App from '../src/App'
 const repositoryUrl =
   'https://github.com/nathanieldailey-rgb/tc26-outreach-lab'
 
+const trustedAskResponse = {
+  answer: 'Trusted answer from the public record.',
+  mode: 'preview',
+  sources: [
+    {
+      title: 'Outreach on Space Traffic Management',
+      href: 'https://doi.org/10.1016/j.actaastro.2025.01.031'
+    }
+  ],
+  notice: 'Deterministic preview; not an official committee position.'
+} as const
+
+const untrustedAskResponses = [
+  ['a whitespace-only answer', { ...trustedAskResponse, answer: '   ' }],
+  ['a whitespace-only notice', { ...trustedAskResponse, notice: '\n\t' }],
+  [
+    'an empty source title',
+    { ...trustedAskResponse, sources: [{ title: ' ', href: trustedAskResponse.sources[0].href }] }
+  ],
+  [
+    'a non-HTTPS DOI link',
+    {
+      ...trustedAskResponse,
+      sources: [{ title: 'Untrusted HTTP source', href: 'http://doi.org/10.1000/unsafe' }]
+    }
+  ],
+  [
+    'a DOI URL containing credentials',
+    {
+      ...trustedAskResponse,
+      sources: [
+        {
+          title: 'Credential-bearing source',
+          href: 'https://reader:secret@doi.org/10.1000/unsafe'
+        }
+      ]
+    }
+  ],
+  [
+    'a DOI lookalike host',
+    {
+      ...trustedAskResponse,
+      sources: [
+        {
+          title: 'Wrong-host source',
+          href: 'https://doi.org.example/10.1000/unsafe'
+        }
+      ]
+    }
+  ],
+  [
+    'a JavaScript URL',
+    {
+      ...trustedAskResponse,
+      sources: [{ title: 'Script source', href: 'javascript:alert(1)' }]
+    }
+  ]
+] as const
+
+function hexChannel(channel: string): number {
+  return Number.parseInt(channel, 16) / 255
+}
+
+function relativeLuminance(hex: string): number {
+  const channels = [hex.slice(1, 3), hex.slice(3, 5), hex.slice(5, 7)].map(
+    hexChannel
+  )
+
+  return channels.reduce((total, channel, index) => {
+    const linear =
+      channel <= 0.04045
+        ? channel / 12.92
+        : ((channel + 0.055) / 1.055) ** 2.4
+    return total + linear * [0.2126, 0.7152, 0.0722][index]
+  }, 0)
+}
+
+function contrastRatio(first: string, second: string): number {
+  const [lighter, darker] = [relativeLuminance(first), relativeLuminance(second)].sort(
+    (left, right) => right - left
+  )
+  return (lighter + 0.05) / (darker + 0.05)
+}
+
 function sectionNamed(name: string | RegExp): HTMLElement {
   const heading = screen.getByRole('heading', { name })
   const section = heading.closest('section')
@@ -322,6 +406,115 @@ describe('editorial application', () => {
     })
   })
 
+  it('locks every shared question path to one submitted context while Ask is pending', async () => {
+    const user = userEvent.setup()
+    let resolveRequest: ((response: Response) => void) | undefined
+    const fetchMock = vi.fn(
+      () =>
+        new Promise<Response>((resolve) => {
+          resolveRequest = resolve
+        })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    const submittedQuestion = 'Why does outreach support safer coordination?'
+    const ask = sectionNamed(/ask the committee/i)
+    const mainQuestion = within(ask).getByRole('textbox', { name: /your question/i })
+    const submit = within(ask).getByRole('button', { name: /ask this question/i })
+    const sample = within(ask).getByRole('button', {
+      name: 'What are the hazards of reentry?'
+    })
+    const researchDesk = screen.getByRole('heading', { level: 1 }).closest('section')
+    if (!researchDesk) throw new Error('Research desk section was not found')
+    const starterForm = within(researchDesk).getByRole('form', {
+      name: /start an ask the committee question/i
+    })
+    const starterInput = within(starterForm).getByRole('textbox', {
+      name: /start with a question/i
+    })
+    const starterSubmit = within(starterForm).getByRole('button', {
+      name: /take this question to ask/i
+    })
+
+    await user.type(mainQuestion, submittedQuestion)
+    await user.click(submit)
+
+    expect(mainQuestion).toBeDisabled()
+    expect(submit).toBeDisabled()
+    expect(sample).toBeDisabled()
+    expect(starterInput).toBeDisabled()
+    expect(starterSubmit).toBeDisabled()
+    expect(within(ask).getByRole('status')).toHaveTextContent(
+      /researching the public record/i
+    )
+
+    await user.type(mainQuestion, ' changed while pending')
+    await user.click(sample)
+    await user.type(starterInput, 'A different question')
+    await user.click(starterSubmit)
+    await user.click(submit)
+
+    expect(mainQuestion).toHaveValue(submittedQuestion)
+    expect(starterInput).toHaveValue('')
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(within(ask).getByRole('status')).toHaveTextContent(
+      /researching the public record/i
+    )
+
+    resolveRequest?.({
+      ok: true,
+      json: async () => trustedAskResponse
+    } as Response)
+
+    expect(await within(ask).findByText(trustedAskResponse.answer)).toBeVisible()
+    expect(mainQuestion).toBeEnabled()
+    expect(submit).toBeEnabled()
+    expect(sample).toBeEnabled()
+    expect(starterInput).toBeEnabled()
+    expect(starterSubmit).toBeEnabled()
+
+    const answer = within(ask)
+      .getByRole('heading', { name: /response from the public record/i })
+      .closest('article')
+    if (!answer) throw new Error('Answer article was not found')
+    expect(within(answer).getByText(submittedQuestion)).toBeVisible()
+
+    await user.click(sample)
+    expect(mainQuestion).toHaveValue('What are the hazards of reentry?')
+    expect(within(answer).getByText(submittedQuestion)).toBeVisible()
+  })
+
+  it.each(untrustedAskResponses)(
+    'rejects a successful response containing %s',
+    async (_caseName, payload) => {
+      const user = userEvent.setup()
+      vi.stubGlobal(
+        'fetch',
+        vi.fn().mockResolvedValue({
+          ok: true,
+          json: async () => payload
+        } as Response)
+      )
+      render(<App />)
+
+      const ask = sectionNamed(/ask the committee/i)
+      const question = within(ask).getByRole('textbox', { name: /your question/i })
+      await user.type(question, 'Show me the trusted public sources.')
+      await user.click(
+        within(ask).getByRole('button', { name: /ask this question/i })
+      )
+
+      expect(await within(ask).findByText(/ask response was rejected/i)).toBeVisible()
+      expect(within(ask).getByRole('status')).toHaveTextContent(/response rejected/i)
+      expect(within(ask).queryByText(trustedAskResponse.answer)).not.toBeInTheDocument()
+      expect(
+        within(ask).queryByRole('heading', { name: /response from the public record/i })
+      ).not.toBeInTheDocument()
+      expect(question).toBeEnabled()
+    }
+  )
+
   it('gives a transparent interface-only error before the Ask API exists', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
@@ -356,5 +549,17 @@ describe('editorial application', () => {
     expect(within(contribute).getByText(/feature lane/i)).toBeVisible()
     expect(within(contribute).getByText(/review lane/i)).toBeVisible()
     expect(within(contribute).getByText(/committee decisions requested/i)).toBeVisible()
+  })
+
+  it('keeps signal orange text above 4.5:1 on the deep paper surface', () => {
+    const styleSource = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+    const signalOrange = styleSource.match(/--orange:\s*(#[0-9a-f]{6})/i)?.[1]
+    const deepPaper = styleSource.match(/--paper-deep:\s*(#[0-9a-f]{6})/i)?.[1]
+
+    expect(signalOrange).toBeDefined()
+    expect(deepPaper).toBeDefined()
+    expect(contrastRatio(signalOrange as string, deepPaper as string)).toBeGreaterThanOrEqual(
+      4.5
+    )
   })
 })
