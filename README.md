@@ -14,7 +14,7 @@ The demonstrator explores a public discovery layer for the IAF-IAA-IISL Space Tr
 
 This is a cross-volume collection, not a single bound journal issue. Eighteen topic reports appear across several volumes of *Acta Astronautica*, one terminology report appears in the *Journal of Space Safety Engineering*, and the synthesis is an additional *Acta Astronautica* paper. The site contains bibliographic metadata and original interpretation—not publisher full text.
 
-## Run the demonstrator locally
+## Run the interface locally (UI-only)
 
 Requirements: Node.js 24 and npm.
 
@@ -24,9 +24,11 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open the local URL printed by Vite. Leaving `OPENAI_API_KEY` empty is intentional and keeps the full demonstration available in preview mode.
+Open the local URL printed by Vite to review the editorial interface. This plain Vite server is UI-only: its `/api/ask` function is not available, so Ask submissions cannot complete in this mode.
 
-### Live Ask mode
+Run the **full demonstration from a deployed preview** that includes the serverless function. On that preview, leaving `OPENAI_API_KEY` empty is intentional: the endpoint returns a visibly labeled deterministic preview mode answer. Task 5 of the implementation plan creates and verifies that preview before a meeting.
+
+### Ask modes on a deployed preview
 
 Set secrets only in the hosting provider or an ignored `.env.local` file. Never put an API key in source code, browser variables, screenshots, issues, or pull requests.
 

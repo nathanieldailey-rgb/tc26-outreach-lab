@@ -4,13 +4,15 @@
 
 Use this 7:00 demonstration first with the Outreach Working Group and then with the committee. Introduce it as a co-chair-led prototype that is ready for collaboration—not an official site, adopted program, or endorsed committee position.
 
-The run works without an API key. In that state, Ask visibly returns deterministic preview mode answers from the same site-owned knowledge entries and DOI metadata used by live mode.
+The full run works from a **verified deployed preview** without an API key. In that state, Ask visibly returns deterministic preview mode answers from the same site-owned knowledge entries and DOI metadata used by live mode.
+
+`npm run dev` starts plain Vite for a UI-only rehearsal. Plain Vite does not serve `/api/ask`, so the local Vite URL cannot support the Ask segment. Do not present that local interface as a full-stack demonstration.
 
 ## Before the room joins
 
 1. Run `npm ci`, `npm test -- --run`, and `npm run build` on the demo branch.
-2. Start with `npm run dev` and open the URL Vite prints.
-3. Leave `OPENAI_API_KEY` empty for the safest repeatable path. If a server-side project key has already been configured, confirm that the interface labels live mode and that preview fallback remains available.
+2. Open the verified deployed preview URL created during Task 5 and confirm that the Ask endpoint returns preview mode.
+3. Leave `OPENAI_API_KEY` empty for the safest repeatable path. If a server-side project key has already been configured on that preview, confirm that the interface labels live mode and that preview fallback remains available.
 4. Open the repository contribution page in a second tab.
 5. Keep a static screenshot of the research desk available in case the display connection fails.
 
@@ -58,6 +60,6 @@ Open the GitHub contribution path. Show the article-pitch lane, feature-request 
 
 - **No API key:** proceed normally; the Ask panel labels preview mode.
 - **Model unavailable:** identify the transparent preview fallback and continue.
-- **Network unavailable:** demonstrate the local site and describe DOI links without opening them.
+- **Network unavailable:** use the UI-only local site, describe DOI links without opening them, and skip the Ask submission rather than implying the local interface has an API.
 - **Shortened agenda:** show the research desk, one Ask response, and the contribution page in three minutes.
 - **Rights question:** open `CONTENT_POLICY.md`; do not speculate about permission.
