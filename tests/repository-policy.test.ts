@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
 import { resolve } from 'node:path'
 
 const repositoryUrl =
@@ -17,6 +18,12 @@ const requiredFiles = [
   '.github/pull_request_template.md',
   '.github/workflows/ci.yml'
 ] as const
+
+const trackedFiles = execFileSync('git', ['ls-files', '-z'], {
+  encoding: 'utf8'
+})
+  .split('\0')
+  .filter((relativePath) => relativePath.length > 0)
 
 function read(relativePath: string): string {
   return readFileSync(resolve(process.cwd(), relativePath), 'utf8')
@@ -242,7 +249,7 @@ describe('clean-room repository policy', () => {
     expect(environment).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/)
   })
 
-  it('keeps every new public artifact free of private identity, hosts, paths, and tokens', () => {
+  it('keeps the entire tracked public surface free of private identity, hosts, paths, and tokens', () => {
     const employerMarker = String.fromCharCode(109, 105, 116, 114, 101)
     const localRoots = [
       ['/', 'Users', '/'].join(''),
@@ -253,7 +260,7 @@ describe('clean-room repository policy', () => {
     const secret = /(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/
     const privateKey = /-----BEGIN [A-Z ]+PRIVATE KEY-----/
 
-    for (const relativePath of requiredFiles) {
+    for (const relativePath of trackedFiles) {
       const source = read(relativePath)
 
       expect(source.toLowerCase(), relativePath).not.toContain(employerMarker)
@@ -267,16 +274,24 @@ describe('clean-room repository policy', () => {
   })
 
   it('uses only the designated repository in collaboration artifacts', () => {
-    const sourceControlUrl = /https?:\/\/[^\s"'`)<>{\]]*(?:github|gitlab)[^\s"'`)<>{\]]*/gi
+    const sourceControlReference = /(?:https?:\/\/[^\s"'`)<>{\]]*(?:github|gitlab)[^\s"'`)<>{\]]*|ssh:\/\/[^\s"'`)<>{\]]+|git@[^\s:"'`)<>{\]]+:[^\s"'`)<>{\]]+)/gi
 
     for (const relativePath of requiredFiles) {
-      const urls = read(relativePath).match(sourceControlUrl) ?? []
+      const urls = read(relativePath).match(sourceControlReference) ?? []
 
       for (const url of urls) {
         expect(url, `${relativePath}: ${url}`).toMatch(
           /^https:\/\/github\.com\/nathanieldailey-rgb\/tc26-outreach-lab(?:$|\/(?:issues|pull)(?:\/|$))/
         )
       }
+    }
+  })
+
+  it('does not track private corpus, credential, executable, or archive file types', () => {
+    const prohibitedExtension = /\.(?:pdf|docx?|xlsx?|pptx?|zip|tar|tgz|gz|7z|sqlite\d?|db|jsonl|pem|p12|pfx|key|cer|crt|exe|dmg)$/i
+
+    for (const relativePath of trackedFiles) {
+      expect(relativePath).not.toMatch(prohibitedExtension)
     }
   })
 })
