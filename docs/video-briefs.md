@@ -4,8 +4,10 @@ These concepts are production briefs, not finished or approved committee videos.
 
 ## Concept 1: Outreach Is Part of the Safety Architecture
 
-**Duration: 75 seconds**  
-**Audience:** students, public communicators, policy staff, and new operators  
+**Duration: 75 seconds**
+
+**Audience:** students, public communicators, policy staff, and new operators
+
 **Learning promise:** explain why shared understanding and feedback affect the quality of space-traffic decisions.
 
 ### Storyboard and script
@@ -24,8 +26,10 @@ Use project-original words and commissioned vector shapes only; use no publisher
 
 ## Concept 2: Reentry Does Not End at an Orbital Boundary
 
-**Duration: 80 seconds**  
-**Audience:** public-safety officials, regulators, journalists, and interested residents  
+**Duration: 80 seconds**
+
+**Audience:** public-safety officials, regulators, journalists, and interested residents
+
 **Learning promise:** show why reentry connects orbital knowledge with terrestrial coordination.
 
 ### Storyboard and script
@@ -44,8 +48,10 @@ Use original generic maps and trajectories; do not imply a forecast for a real e
 
 ## Concept 3: Traffic Management Beyond Earth Orbit
 
-**Duration: 75 seconds**  
-**Audience:** program leaders, emerging-space practitioners, educators, and the public  
+**Duration: 75 seconds**
+
+**Audience:** program leaders, emerging-space practitioners, educators, and the public
+
 **Learning promise:** introduce the coordination questions that grow as missions move from Earth orbit toward the Moon and Mars.
 
 ### Storyboard and script
