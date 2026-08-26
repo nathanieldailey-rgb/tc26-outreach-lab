@@ -42,7 +42,9 @@ describe('knowledge retrieval', () => {
     'How do I bake a space-themed cake?',
     'Moon cake',
     'outreach cake',
-    'AI Moon'
+    'AI Moon',
+    'How do I pay a space traffic ticket?',
+    'Where can I buy collision avoidance insurance?'
   ])('rejects generic-overlap questions outside the public knowledge domain: %s', (question) => {
     const results = retrieveKnowledge(question)
 
