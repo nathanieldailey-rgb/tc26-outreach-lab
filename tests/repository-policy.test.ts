@@ -62,6 +62,25 @@ describe('public collaboration package', () => {
     expect(readme).toContain(repositoryUrl)
   })
 
+  it('does not represent the plain Vite server as a full-stack Ask runtime', () => {
+    const packageManifest = JSON.parse(read('package.json')) as {
+      scripts: Record<string, string>
+    }
+    const readme = read('README.md')
+    const runbook = read('docs/demo-runbook.md')
+
+    expect(packageManifest.scripts.dev).toBe('vite')
+    expectAll(readme, [
+      /UI-only/i,
+      /plain Vite[\s\S]{0,240}\/api\/ask[\s\S]{0,180}(?:not available|unavailable)/i,
+      /full demonstration[\s\S]{0,240}(?:deployed|hosted) preview/i
+    ])
+    expectAll(runbook, [
+      /verified (?:deployed )?preview/i,
+      /plain Vite[\s\S]{0,240}(?:does not|cannot)[\s\S]{0,120}\/api\/ask/i
+    ])
+  })
+
   it('creates two distinct issue lanes and a reviewable pull-request path', () => {
     const contributing = read('CONTRIBUTING.md')
     const articleTemplate = read(
