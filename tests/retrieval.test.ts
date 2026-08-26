@@ -1,13 +1,11 @@
 import { knowledgeEntries } from '../src/content/knowledge'
-import * as retrieval from '../src/lib/retrieval'
-
-const { composePreviewAnswer, retrieveKnowledge } = retrieval
+import {
+  collectSourceSlugs,
+  composePreviewAnswer,
+  retrieveKnowledge
+} from '../src/lib/retrieval'
 const insufficientPreview =
   'Preview limitation: The public project knowledge base does not contain enough information to answer this question. Consult the linked publication records or ask a committee reviewer.'
-
-type SourceCollector = (
-  entries: readonly { readonly sourceSlugs: readonly string[] }[]
-) => string[]
 
 describe('knowledge retrieval', () => {
   it('returns no results for an empty or stopword-only query', () => {
@@ -25,10 +23,35 @@ describe('knowledge retrieval', () => {
   })
 
   it.each([
+    [
+      'Could you explain why public outreach matters to ordinary people?',
+      ['outreach-rationale', 'committee-mission']
+    ],
+    [
+      'Tell me about reentry hazards for a satellite falling through the atmosphere',
+      ['operations-reentry-cola']
+    ]
+  ])('keeps only strong in-domain evidence in verbose plain-language questions: %s', (question, expectedSlugs) => {
+    expect(retrieveKnowledge(question).map(({ slug }) => slug)).toEqual(
+      expectedSlugs
+    )
+  })
+
+  it.each([
     'What is the space weather forecast?',
-    'How do I bake a space-themed cake?'
+    'How do I bake a space-themed cake?',
+    'Moon cake',
+    'outreach cake',
+    'AI Moon'
   ])('rejects generic-overlap questions outside the public knowledge domain: %s', (question) => {
     const results = retrieveKnowledge(question)
+
+    expect(results).toEqual([])
+    expect(composePreviewAnswer(results)).toBe(insufficientPreview)
+  })
+
+  it('rejects mixed terms that only match unrelated knowledge entries', () => {
+    const results = retrieveKnowledge('AI forecast Moon')
 
     expect(results).toEqual([])
     expect(composePreviewAnswer(results)).toBe(insufficientPreview)
@@ -51,21 +74,28 @@ describe('knowledge retrieval', () => {
 
     expect(results.length).toBeGreaterThan(1)
     for (const result of results) {
-      expect(result.sourceSlugs).toEqual(declaredBySlug.get(result.slug))
+      const declaredSources = declaredBySlug.get(result.slug)
+
+      expect(result.sourceSlugs).toEqual(declaredSources)
+      expect(result.sourceSlugs).not.toBe(declaredSources)
     }
+
+    const firstResult = results[0]
+    const declaredSources = declaredBySlug.get(firstResult.slug) ?? []
+    const mutationProbe = 'retrieval-mutation-probe'
+    let mutationLeaked = false
+
+    try {
+      firstResult.sourceSlugs.push(mutationProbe)
+      mutationLeaked = declaredSources.includes(mutationProbe)
+    } finally {
+      firstResult.sourceSlugs.pop()
+    }
+
+    expect(mutationLeaked).toBe(false)
   })
 
   it('exports a deterministic stable aggregate source de-duplication helper', () => {
-    const collectSourceSlugs = Reflect.get(
-      retrieval,
-      'collectSourceSlugs'
-    ) as SourceCollector | undefined
-
-    expect.soft(collectSourceSlugs).toBeTypeOf('function')
-    if (!collectSourceSlugs) {
-      return
-    }
-
     expect(
       collectSourceSlugs([
         { sourceSlugs: ['report-a', 'report-b', 'report-a'] },

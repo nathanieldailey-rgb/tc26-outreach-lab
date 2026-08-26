@@ -20,6 +20,9 @@ const STOPWORDS = new Set([
   'in',
   'is',
   'it',
+  'important',
+  'matter',
+  'matters',
   'of',
   'on',
   'or',
@@ -42,6 +45,10 @@ const FIELD_WEIGHTS = {
   text: 1
 } as const
 
+const MINIMUM_QUERY_COVERAGE = 0.5
+const MINIMUM_RELEVANCE_SCORE = 8
+const MAXIMUM_COVERAGE_TOKEN_COUNT = 3
+
 export type RetrievalResult = KnowledgeEntry & {
   score: number
 }
@@ -60,18 +67,28 @@ function tokenSet(value: string): Set<string> {
   return new Set(normalizeTokens(value))
 }
 
-function scoreEntry(queryTokens: readonly string[], entry: KnowledgeEntry): number {
+function scoreEntry(
+  queryTokens: readonly string[],
+  entry: KnowledgeEntry
+): { matchedTokenCount: number; score: number } {
   const titleTokens = tokenSet(entry.title)
   const keywordTokens = tokenSet(entry.keywords.join(' '))
   const textTokens = tokenSet(entry.text)
+  let matchedTokenCount = 0
 
-  return queryTokens.reduce((score, token) => {
+  const score = queryTokens.reduce((total, token) => {
     const titleScore = titleTokens.has(token) ? FIELD_WEIGHTS.title : 0
     const keywordScore = keywordTokens.has(token) ? FIELD_WEIGHTS.keywords : 0
     const textScore = textTokens.has(token) ? FIELD_WEIGHTS.text : 0
 
-    return score + titleScore + keywordScore + textScore
+    if (titleScore > 0 || keywordScore > 0 || textScore > 0) {
+      matchedTokenCount += 1
+    }
+
+    return total + titleScore + keywordScore + textScore
   }, 0)
+
+  return { matchedTokenCount, score }
 }
 
 export function retrieveKnowledge(
@@ -89,26 +106,51 @@ export function retrieveKnowledge(
     .map((entry, index) => ({
       entry,
       index,
-      score: scoreEntry(queryTokens, entry)
+      ...scoreEntry(queryTokens, entry)
     }))
-    .filter(({ score }) => score > 0)
+    .filter(({ score }) => score >= MINIMUM_RELEVANCE_SCORE)
     .sort((left, right) => right.score - left.score || left.index - right.index)
-    .slice(0, resultLimit)
 
-  const seenSourceSlugs = new Set<string>()
+  const strongestResult = ranked[0]
+  const coverageTokenCount = Math.min(
+    queryTokens.length,
+    MAXIMUM_COVERAGE_TOKEN_COUNT
+  )
+  const queryCoverage =
+    (strongestResult?.matchedTokenCount ?? 0) / coverageTokenCount
+  const minimumMatchedTokenCount = queryTokens.length === 1 ? 1 : 2
 
-  return ranked.map(({ entry, score }) => ({
+  if (
+    queryCoverage < MINIMUM_QUERY_COVERAGE ||
+    (strongestResult?.matchedTokenCount ?? 0) < minimumMatchedTokenCount ||
+    (strongestResult?.score ?? 0) < MINIMUM_RELEVANCE_SCORE
+  ) {
+    return []
+  }
+
+  return ranked.slice(0, resultLimit).map(({ entry, score }) => ({
     ...entry,
-    sourceSlugs: entry.sourceSlugs.filter((sourceSlug) => {
-      if (seenSourceSlugs.has(sourceSlug)) {
-        return false
-      }
-
-      seenSourceSlugs.add(sourceSlug)
-      return true
-    }),
+    sourceSlugs: [...entry.sourceSlugs],
     score
   }))
+}
+
+export function collectSourceSlugs(
+  entries: readonly { readonly sourceSlugs: readonly string[] }[]
+): string[] {
+  const seenSourceSlugs = new Set<string>()
+  const collectedSourceSlugs: string[] = []
+
+  for (const { sourceSlugs } of entries) {
+    for (const sourceSlug of sourceSlugs) {
+      if (!seenSourceSlugs.has(sourceSlug)) {
+        seenSourceSlugs.add(sourceSlug)
+        collectedSourceSlugs.push(sourceSlug)
+      }
+    }
+  }
+
+  return collectedSourceSlugs
 }
 
 export function composePreviewAnswer(results: readonly RetrievalResult[]): string {
@@ -117,9 +159,7 @@ export function composePreviewAnswer(results: readonly RetrievalResult[]): strin
   }
 
   const answer = results.map(({ title, text }) => `${title}: ${text}`).join(' ')
-  const sourceSlugs = [
-    ...new Set(results.flatMap(({ sourceSlugs: sources }) => sources))
-  ]
+  const sourceSlugs = collectSourceSlugs(results)
   const sourceNote =
     sourceSlugs.length > 0 ? ` Source records: ${sourceSlugs.join(', ')}.` : ''
 

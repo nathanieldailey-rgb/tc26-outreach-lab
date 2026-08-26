@@ -21,6 +21,57 @@ const publicScanExclusions = new Map([
   ['package-lock.json', 'generated third-party lock metadata']
 ])
 
+const approvedRepositoryBase =
+  'https://github.com/nathanieldailey-rgb/tc26-outreach-lab'
+
+function isApprovedPublicRepositoryUrl(candidate: string): boolean {
+  let url: URL
+
+  try {
+    url = new URL(candidate)
+  } catch {
+    return false
+  }
+
+  const approvedPath = '/nathanieldailey-rgb/tc26-outreach-lab'
+  const approvedOrigin = new URL(approvedRepositoryBase).origin
+
+  if (
+    url.origin !== approvedOrigin ||
+    url.username.length > 0 ||
+    url.password.length > 0
+  ) {
+    return false
+  }
+
+  if (url.pathname === approvedPath || url.pathname === `${approvedPath}/`) {
+    return true
+  }
+
+  if (!url.pathname.startsWith(`${approvedPath}/`)) {
+    return false
+  }
+
+  const suffix = url.pathname.slice(approvedPath.length)
+  return /^\/(?:issues|pull)(?:\/|$)/.test(suffix)
+}
+
+function collectSourceControlUrls(source: string): string[] {
+  const urls = source.match(/https?:\/\/[^\s"'`)<>{\]]+/gi) ?? []
+
+  return urls.filter((candidate) => {
+    try {
+      const hostnameParts = new URL(candidate).hostname.toLowerCase().split('.')
+
+      return hostnameParts.some(
+        (part) => part === 'github' || part === 'gitlab'
+      )
+    } catch {
+      return false
+    }
+  })
+}
+
 function collectPublicSourceFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true })
     .sort((left, right) => left.name.localeCompare(right.name))
@@ -396,10 +447,58 @@ describe('clean-room public source boundary', () => {
       }
       expect(source, fileLabel).not.toMatch(/(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/)
       expect(source, fileLabel).not.toMatch(/-----BEGIN [A-Z ]+PRIVATE KEY-----/)
-      expect(source, fileLabel).not.toMatch(
-        /https?:\/\/(?:[^/]+\.)?git(?:hub|lab)\./i
-      )
+      for (const sourceControlUrl of collectSourceControlUrls(source)) {
+        expect(
+          isApprovedPublicRepositoryUrl(sourceControlUrl),
+          `${fileLabel}: ${sourceControlUrl}`
+        ).toBe(true)
+      }
       expect(source, fileLabel).not.toMatch(/(?:abstract|fullText)\s*:/)
+    }
+  })
+
+  it('allows only the designated public repository base and issue or pull routes', () => {
+    const approvedPathLength = new URL(approvedRepositoryBase).pathname.length
+    const unrelatedSameLengthPath = `/${'x'.repeat(approvedPathLength - 1)}`
+    const approvedUrls = [
+      approvedRepositoryBase,
+      `${approvedRepositoryBase}/`,
+      `${approvedRepositoryBase}/issues`,
+      `${approvedRepositoryBase}/issues/new?template=article`,
+      `${approvedRepositoryBase}/pull/42#discussion`,
+      `${approvedRepositoryBase}?tab=readme`
+    ]
+    const rejectedUrls = [
+      `${approvedRepositoryBase}/actions`,
+      `${approvedRepositoryBase}:443`,
+      ['https://', 'github.com', unrelatedSameLengthPath, '/issues'].join(''),
+      ['https://', 'github.com/another-owner/another-repository'].join(''),
+      ['https://', 'gitlab.example.invalid/group/project'].join(''),
+      approvedRepositoryBase.replace('https:', 'http:'),
+      approvedRepositoryBase.replace('github.com', 'name@example.com@github.com')
+    ]
+
+    for (const url of approvedUrls) {
+      expect(isApprovedPublicRepositoryUrl(url), url).toBe(true)
+    }
+    for (const url of rejectedUrls) {
+      expect(isApprovedPublicRepositoryUrl(url), url).toBe(false)
+    }
+  })
+
+  it('discovers GitHub and GitLab URLs across canonical and subdomain hosts', () => {
+    const sourceControlUrls = [
+      ['https://', 'github.com/another-owner/another-repository'].join(''),
+      ['https://', 'gist.github.com/user/123'].join(''),
+      ['https://', 'www.gitlab.com/group/project'].join(''),
+      ['https://', 'gitlab.example.invalid/group/project'].join('')
+    ]
+
+    expect(collectSourceControlUrls(sourceControlUrls.join('\n'))).toEqual(
+      sourceControlUrls
+    )
+    for (const sourceControlUrl of sourceControlUrls) {
+      expect(isApprovedPublicRepositoryUrl(sourceControlUrl)).toBe(false)
     }
   })
 })
