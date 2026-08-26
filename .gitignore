@@ -1,0 +1,12 @@
+.worktrees/
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.vercel/
+.env
+.env.*
+!.env.example
+.DS_Store
+*.log
