@@ -34,13 +34,16 @@ Set secrets only in the hosting provider or an ignored `.env.local` file. Never 
 
 | Variable | Purpose |
 | --- | --- |
-| `OPENAI_API_KEY` | Optional server-only project key. Empty selects preview mode. |
+| `ASK_LIVE_ENABLED` | Must be exactly `true` before the server will consider a live model call. It defaults to `false`. |
+| `OPENAI_API_KEY` | Server-only project key required for live mode. Empty selects preview mode. |
 | `OPENAI_MODEL` | Optional server-side model override; the example uses `gpt-5.6-luna`. |
-| `ALLOWED_ORIGIN` | Optional comma-separated list of exact browser origins allowed to call the endpoint. |
+| `ALLOWED_ORIGIN` | Required exact, comma-separated browser-origin allowlist for live mode. |
+| `UPSTASH_REDIS_REST_URL` | Server-only durable Redis endpoint required for shared rate limiting. |
+| `UPSTASH_REDIS_REST_TOKEN` | Server-only durable Redis credential required for shared rate limiting. |
 
-The current request throttle is deliberately **per-instance** and protects only a committee demonstration. A public release with sustained traffic needs a durable rate limit shared across serverless instances. No durable-store environment variables are supported yet; they should be named in `.env.example` only after a reviewed implementation actually consumes them.
+Live mode **fails closed** to a labeled deterministic preview unless every required setting is present and both durable limits succeed. The shared limits allow no more than **8 live calls per IP per minute** and **60 live calls in any 24-hour window** across serverless instances. A Redis timeout, rejection, or configuration error cannot fall through to a paid model call. Use a dedicated OpenAI project and set its own budget alert or spend limit as an independent backstop.
 
-The API sends bounded site-owned context, sets `store: false`, and falls back visibly to preview mode if no key is configured or the upstream model is unavailable. It does not send journal PDFs, publisher abstracts, subscription text, or conversation history.
+When live mode is enabled, the server sends the visitor's question, bounded site-owned public context, and a pseudonymous safety identifier to OpenAI. It sets `store: false`, but that setting is not a promise of zero abuse-monitoring retention. The form warns visitors before submission not to enter personal, confidential, controlled, or proprietary information. The API never sends journal PDFs, publisher abstracts, subscription text, or conversation history, and it falls back visibly if the model or validated structured output is unavailable.
 
 ## Verify a change
 

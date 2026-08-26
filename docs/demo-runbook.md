@@ -12,7 +12,7 @@ The full run works from a **verified deployed preview** without an API key. In t
 
 1. Run `npm ci`, `npm test -- --run`, and `npm run build` on the demo branch.
 2. Open the verified deployed preview URL created during Task 5 and confirm that the Ask endpoint returns preview mode.
-3. Leave `OPENAI_API_KEY` empty for the safest repeatable path. If a server-side project key has already been configured on that preview, confirm that the interface labels live mode and that preview fallback remains available.
+3. Leave `ASK_LIVE_ENABLED=false` and `OPENAI_API_KEY` empty for the safest repeatable path. If live mode has already been configured on that preview, confirm the exact-origin allowlist, durable Redis limits, dedicated project key and budget control before the meeting; never weaken those controls just for the demonstration.
 4. Open the repository contribution page in a second tab.
 5. Keep a static screenshot of the research desk available in case the display connection fails.
 
@@ -32,7 +32,7 @@ Open the featured article, “Outreach is part of the safety architecture.” Sh
 
 Submit: **“Why is outreach part of space traffic management?”**
 
-Call out three trust cues: the visible preview mode or live mode label, the source list with DOI links, and the limitation notice. With no API key, explain that the deterministic answer keeps the demo useful without disguising itself as model output. With a live key, note that the server sends only bounded site-owned context and sets `store: false`.
+Call out four trust cues: the pre-submit privacy warning, the visible preview mode or live mode label, the source list with DOI links, and the limitation notice. With live mode disabled, explain that the deterministic answer keeps the demo useful without disguising itself as model output. With live mode enabled, note that the server sends the question, bounded site-owned public context, and a pseudonymous safety identifier to OpenAI; `store: false` does not promise zero abuse-monitoring retention.
 
 ### 3:30–4:30 — Navigate the research (60 seconds)
 
@@ -53,7 +53,7 @@ Open the GitHub contribution path. Show the article-pitch lane, feature-request 
 3. Editorial board, maintainers, and approval workflow.
 4. Authors and topics for the first outreach series.
 5. Written publisher guidance for future uses beyond metadata and links.
-6. Owner and budget for hosting, a project LLM key, and a durable rate limit before public traffic.
+6. Owner and budget for hosting, a dedicated project LLM key, its spend controls, and ongoing operation of the durable rate limit.
 7. Video priorities, narrators, captions, transcripts, and accessibility review.
 
 ## Fallbacks
