@@ -51,8 +51,12 @@ describe('public collaboration package', () => {
       /OPENAI_API_KEY/,
       /OPENAI_MODEL/,
       /ALLOWED_ORIGIN/,
-      /per-instance/i,
-      /durable rate limit/i,
+      /ASK_LIVE_ENABLED/,
+      /UPSTASH_REDIS_REST_URL/,
+      /UPSTASH_REDIS_REST_TOKEN/,
+      /fail(?:s|ed)? closed/i,
+      /8[^\n]{0,40}(?:minute|min)|(?:minute|min)[^\n]{0,40}8/i,
+      /60[^\n]{0,40}24[- ]hour|24[- ]hour[^\n]{0,40}60/i,
       /npm ci/,
       /npm run dev/,
       /npm test -- --run/,
@@ -229,6 +233,9 @@ describe('clean-room repository policy', () => {
     expect(environment).toMatch(/^OPENAI_API_KEY=\s*$/m)
     expect(environment).toMatch(/^OPENAI_MODEL=gpt-5\.6-luna\s*$/m)
     expect(environment).toMatch(/^ALLOWED_ORIGIN=\s*$/m)
+    expect(environment).toMatch(/^ASK_LIVE_ENABLED=false\s*$/m)
+    expect(environment).toMatch(/^UPSTASH_REDIS_REST_URL=\s*$/m)
+    expect(environment).toMatch(/^UPSTASH_REDIS_REST_TOKEN=\s*$/m)
     expect(environment).not.toMatch(
       /(?:sk-|ghp_|glpat-)[A-Za-z0-9_-]{12,}/
     )
