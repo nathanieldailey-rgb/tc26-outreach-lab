@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { createElement } from 'react'
 
 import ExplainerStudio from '../src/components/ExplainerStudio'
@@ -13,7 +13,7 @@ describe('Explainer Studio storyboard', () => {
   })
 
   afterEach(() => {
-    vi.runOnlyPendingTimers()
+    act(() => vi.runOnlyPendingTimers())
     vi.useRealTimers()
   })
 
@@ -28,7 +28,7 @@ describe('Explainer Studio storyboard', () => {
     expect(within(player()).getByText(/frame 1 of 5/i)).toBeVisible()
     expect(within(player()).getByRole('button', { name: /play storyboard/i })).toBeVisible()
 
-    vi.advanceTimersByTime(10_500)
+    act(() => vi.advanceTimersByTime(10_500))
     expect(within(player()).getByText(/frame 1 of 5/i)).toBeVisible()
   })
 
@@ -40,12 +40,12 @@ describe('Explainer Studio storyboard', () => {
     expect(within(controls).getByRole('button', { name: /pause storyboard/i })).toBeVisible()
     expect(vi.getTimerCount()).toBe(1)
 
-    vi.advanceTimersByTime(3_500)
+    act(() => vi.advanceTimersByTime(3_500))
     expect(within(controls).getByText(/frame 2 of 5/i)).toBeVisible()
 
     fireEvent.click(within(controls).getByRole('button', { name: /pause storyboard/i }))
     expect(within(controls).getByRole('button', { name: /play storyboard/i })).toBeVisible()
-    vi.advanceTimersByTime(7_000)
+    act(() => vi.advanceTimersByTime(7_000))
     expect(within(controls).getByText(/frame 2 of 5/i)).toBeVisible()
 
     fireEvent.click(within(controls).getByRole('button', { name: /play storyboard/i }))
