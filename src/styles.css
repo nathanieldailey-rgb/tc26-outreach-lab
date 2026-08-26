@@ -352,6 +352,74 @@ main > section {
   margin-bottom: 2rem;
 }
 
+.question-starter {
+  max-width: 38rem;
+  margin: 0 0 1.65rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--ink);
+}
+
+.question-starter > label {
+  display: block;
+  margin-bottom: 0.45rem;
+  color: var(--ink);
+  font-size: 0.71rem;
+  font-weight: 850;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.question-starter__control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.question-starter input {
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--ink);
+  border-radius: 0;
+  background: var(--paper-light);
+}
+
+.question-starter input[aria-invalid="true"] {
+  border-color: var(--error);
+  box-shadow: inset 0 -0.2rem 0 var(--error);
+}
+
+.question-starter button {
+  min-height: 3rem;
+  padding: 0.65rem 0.9rem;
+  border: 1px solid var(--ink);
+  border-left: 0;
+  border-radius: 0;
+  background: var(--ink);
+  color: var(--paper-light);
+  cursor: pointer;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.055em;
+  text-transform: uppercase;
+}
+
+.question-starter button:hover {
+  background: var(--cyan);
+}
+
+.question-starter > p {
+  margin: 0.35rem 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.question-starter #starter-validation {
+  min-height: 1.1rem;
+  color: var(--error);
+  font-weight: 750;
+}
+
 .margin-note {
   max-width: 31rem;
   margin: 0;
@@ -607,7 +675,12 @@ textarea {
 .source-pathways li a,
 .publication-results__link,
 .contribution-lanes a,
-.contribute__repository a {
+.contribute__repository a,
+.answer__sources a {
+  display: inline-flex;
+  min-height: 2.75rem;
+  align-items: center;
+  padding-block: 0.35rem;
   color: var(--orange);
   font-size: 0.78rem;
   font-weight: 800;
@@ -1344,6 +1417,15 @@ textarea {
   border-top: 1px solid rgb(244 239 227 / 38%);
 }
 
+.storyboard__motion-note {
+  margin: -0.75rem 0 1.5rem;
+  padding: 0.75rem 1rem;
+  border-left: 0.24rem solid var(--cyan-bright);
+  background: rgb(98 213 220 / 10%);
+  color: #d7e5e3;
+  font-size: 0.78rem;
+}
+
 .storyboard__controls .button--quiet:hover:not(:disabled) {
   border-color: var(--cyan-bright);
   background: rgb(98 213 220 / 9%);
@@ -1707,6 +1789,15 @@ textarea {
 
   .sample-questions > div {
     display: grid;
+  }
+
+  .question-starter__control {
+    grid-template-columns: 1fr;
+  }
+
+  .question-starter button {
+    border-top: 0;
+    border-left: 1px solid var(--ink);
   }
 
   .sample-questions button {

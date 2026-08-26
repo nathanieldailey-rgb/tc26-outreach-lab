@@ -1,3 +1,5 @@
+import { useState } from 'react'
+
 import ArticleFeature from './components/ArticleFeature'
 import AskCommittee from './components/AskCommittee'
 import Contribute from './components/Contribute'
@@ -7,13 +9,25 @@ import PublicationLibrary from './components/PublicationLibrary'
 import ResearchDesk from './components/ResearchDesk'
 
 export default function App() {
+  const [question, setQuestion] = useState('')
+
+  const moveQuestionToAsk = (draft: string) => {
+    setQuestion(draft)
+
+    const askSection = document.getElementById('ask')
+    const askInput = document.getElementById('committee-question')
+
+    askSection?.scrollIntoView?.({ block: 'start' })
+    askInput?.focus()
+  }
+
   return (
     <>
       <Header />
       <main id="main-content">
-        <ResearchDesk />
+        <ResearchDesk onStartQuestion={moveQuestionToAsk} />
         <ArticleFeature />
-        <AskCommittee />
+        <AskCommittee question={question} onQuestionChange={setQuestion} />
         <PublicationLibrary />
         <ExplainerStudio />
         <Contribute />

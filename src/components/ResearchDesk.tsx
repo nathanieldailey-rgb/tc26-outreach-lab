@@ -1,4 +1,28 @@
-export default function ResearchDesk() {
+import { type FormEvent, useRef, useState } from 'react'
+
+type ResearchDeskProps = {
+  onStartQuestion: (question: string) => void
+}
+
+export default function ResearchDesk({ onStartQuestion }: ResearchDeskProps) {
+  const [draft, setDraft] = useState('')
+  const [validationError, setValidationError] = useState('')
+  const questionInput = useRef<HTMLInputElement>(null)
+
+  const submitQuestionStarter = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    const question = draft.trim()
+
+    if (!question) {
+      setValidationError('Enter a question to continue to the full Ask workspace.')
+      questionInput.current?.focus()
+      return
+    }
+
+    setValidationError('')
+    onStartQuestion(question)
+  }
+
   return (
     <section className="research-desk traffic-field" id="research-desk" aria-labelledby="desk-title">
       <div className="research-desk__lead">
@@ -9,6 +33,36 @@ export default function ResearchDesk() {
           that operators, policymakers, students, and public readers bring to a shared
           operating domain.
         </p>
+        <form
+          className="question-starter"
+          aria-label="Start an Ask the Committee question"
+          onSubmit={submitQuestionStarter}
+          noValidate
+        >
+          <label htmlFor="starter-question">Start with a question</label>
+          <div className="question-starter__control">
+            <input
+              ref={questionInput}
+              id="starter-question"
+              type="text"
+              value={draft}
+              maxLength={500}
+              aria-describedby="starter-guidance starter-validation"
+              aria-invalid={validationError ? 'true' : 'false'}
+              onChange={(event) => {
+                setDraft(event.target.value)
+                if (validationError) setValidationError('')
+              }}
+            />
+            <button type="submit">Take this question to Ask</button>
+          </div>
+          <p id="starter-guidance">
+            Draft here, then continue to the full source-bounded question workspace.
+          </p>
+          <p id="starter-validation" role="status" aria-live="polite">
+            {validationError}
+          </p>
+        </form>
         <p className="margin-note">
           Demonstrator status — proposed for committee review. No organizational marks or
           formal endorsement are implied.
@@ -32,6 +86,11 @@ export default function ResearchDesk() {
           <span className="research-index__number">03 / Source-bounded Q&amp;A</span>
           <strong>Ask the Committee</strong>
           <span>Question the public record and see every source</span>
+        </a>
+        <a className="research-index__entry" href="#studio">
+          <span className="research-index__number">04 / Explainer media</span>
+          <strong>Videos / Studio</strong>
+          <span>Review three briefs and control the storyboard</span>
         </a>
       </div>
     </section>

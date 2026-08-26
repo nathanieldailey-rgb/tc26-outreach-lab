@@ -14,6 +14,11 @@ const sampleQuestions = [
   'How does traffic management change from Moon to Mars?'
 ]
 
+type AskCommitteeProps = {
+  question: string
+  onQuestionChange: (question: string) => void
+}
+
 function isAskResponse(value: unknown): value is AskResponse {
   if (!value || typeof value !== 'object') return false
 
@@ -33,8 +38,10 @@ function isAskResponse(value: unknown): value is AskResponse {
   )
 }
 
-export default function AskCommittee() {
-  const [question, setQuestion] = useState('')
+export default function AskCommittee({
+  question,
+  onQuestionChange
+}: AskCommitteeProps) {
   const [status, setStatus] = useState('Ready for a question.')
   const [validationError, setValidationError] = useState('')
   const [requestError, setRequestError] = useState('')
@@ -42,7 +49,7 @@ export default function AskCommittee() {
   const [isLoading, setIsLoading] = useState(false)
 
   const chooseSample = (sample: string) => {
-    setQuestion(sample)
+    onQuestionChange(sample)
     setValidationError('')
     setRequestError('')
     setStatus('Sample question ready to submit.')
@@ -122,7 +129,7 @@ export default function AskCommittee() {
             id="committee-question"
             value={question}
             onChange={(event) => {
-              setQuestion(event.target.value)
+              onQuestionChange(event.target.value)
               if (validationError) setValidationError('')
             }}
             aria-describedby="question-guidance question-count question-validation"

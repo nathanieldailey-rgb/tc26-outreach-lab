@@ -61,15 +61,44 @@ const storyboardFrames = [
 ] as const
 
 const frameDuration = 3_500
+const reducedMotionQuery = '(prefers-reduced-motion: reduce)'
+
+function motionIsReduced(): boolean {
+  return (
+    typeof window !== 'undefined' &&
+    typeof window.matchMedia === 'function' &&
+    window.matchMedia(reducedMotionQuery).matches
+  )
+}
+
+function useReducedMotionPreference(): boolean {
+  const [isReduced, setIsReduced] = useState(motionIsReduced)
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return undefined
+
+    const mediaQuery = window.matchMedia(reducedMotionQuery)
+    const updatePreference = (event: MediaQueryListEvent) => {
+      setIsReduced(event.matches)
+    }
+
+    setIsReduced(mediaQuery.matches)
+    mediaQuery.addEventListener('change', updatePreference)
+    return () => mediaQuery.removeEventListener('change', updatePreference)
+  }, [])
+
+  return isReduced
+}
 
 export default function ExplainerStudio() {
   const [currentFrame, setCurrentFrame] = useState(0)
   const [isPlaying, setIsPlaying] = useState(false)
+  const prefersReducedMotion = useReducedMotionPreference()
   const finalFrame = storyboardFrames.length - 1
   const frame = storyboardFrames[currentFrame]
 
   useEffect(() => {
-    if (!isPlaying) return undefined
+    if (!isPlaying || prefersReducedMotion) return undefined
 
     const timer = window.setInterval(() => {
       setCurrentFrame((index) => {
@@ -80,7 +109,11 @@ export default function ExplainerStudio() {
     }, frameDuration)
 
     return () => window.clearInterval(timer)
-  }, [finalFrame, isPlaying])
+  }, [finalFrame, isPlaying, prefersReducedMotion])
+
+  useEffect(() => {
+    if (prefersReducedMotion) setIsPlaying(false)
+  }, [prefersReducedMotion])
 
   const moveToFrame = (index: number) => {
     setIsPlaying(false)
@@ -126,7 +159,11 @@ export default function ExplainerStudio() {
         className="storyboard"
         role="group"
         aria-labelledby="storyboard-title"
-        aria-describedby="storyboard-instructions"
+        aria-describedby={
+          prefersReducedMotion
+            ? 'storyboard-instructions storyboard-motion-note'
+            : 'storyboard-instructions'
+        }
       >
         <div className="storyboard__copy">
           <p className="eyebrow">Interactive brief / outreach as infrastructure</p>
@@ -136,6 +173,13 @@ export default function ExplainerStudio() {
             Playback never starts automatically.
           </p>
         </div>
+
+        {prefersReducedMotion ? (
+          <p className="storyboard__motion-note" id="storyboard-motion-note">
+            Reduced motion is on. Timed playback is unavailable; use Previous, Next, or
+            the frame control below.
+          </p>
+        ) : null}
 
         <div className="storyboard__stage" aria-live="polite" aria-atomic="true">
           <div className="storyboard__orbit" aria-hidden="true">
@@ -172,7 +216,7 @@ export default function ExplainerStudio() {
             className="button button--primary"
             type="button"
             onClick={() => setIsPlaying((playing) => !playing)}
-            disabled={currentFrame === finalFrame}
+            disabled={currentFrame === finalFrame || prefersReducedMotion}
           >
             {isPlaying ? 'Pause storyboard' : 'Play storyboard'}
           </button>
