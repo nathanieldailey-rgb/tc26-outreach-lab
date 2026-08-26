@@ -344,6 +344,36 @@ describe('editorial application', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('places an accessible live-data warning before the Ask submission control', () => {
+    render(<App />)
+
+    const ask = sectionNamed(/ask the committee/i)
+    const notice = within(ask).getByRole('note', {
+      name: /before you submit/i
+    })
+    const question = within(ask).getByRole('textbox', { name: /your question/i })
+    const submit = within(ask).getByRole('button', { name: /ask this question/i })
+
+    expect(notice).toBeVisible()
+    expect(notice).toHaveClass('submission-notice')
+    expect(notice).toHaveTextContent(
+      /live mode may send your question, public site context, and a pseudonymous safety identifier to openai/i
+    )
+    expect(notice).toHaveTextContent(
+      /do not submit personal, confidential, controlled, or proprietary information/i
+    )
+    expect(notice).toHaveTextContent(
+      /store:false does not promise zero abuse-monitoring retention/i
+    )
+    expect(
+      notice.compareDocumentPosition(submit) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy()
+    expect(question).toHaveAttribute(
+      'aria-describedby',
+      expect.stringContaining('ask-data-notice')
+    )
+  })
+
   it('posts the Ask JSON contract and renders loading, mode, sources, and notice', async () => {
     const user = userEvent.setup()
     let resolveRequest: ((response: Response) => void) | undefined
