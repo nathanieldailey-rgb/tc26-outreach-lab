@@ -45,7 +45,7 @@ async function invoke(
     method: 'POST',
     headers: {
       'content-type': 'application/json',
-      'user-agent': 'ask-api-test-agent',
+      'user-agent': 'api-handler-test-agent',
       'x-forwarded-for': '203.0.113.10'
     },
     body: { question: defaultQuestion },
@@ -232,7 +232,7 @@ describe('bounded JSON request parsing', () => {
     [{ question: '  What are the hazards of reentry?  ' }, 'object'],
     [JSON.stringify({ question: 'What are the hazards of reentry?' }), 'string'],
     [Buffer.from(JSON.stringify({ question: 'What are the hazards of reentry?' })), 'Buffer']
-  ])('accepts a JSON %s body and trims the question', async (body) => {
+  ])('accepts a JSON body and trims the question: %s', async (body, _description) => {
     const result = await invoke({
       headers: {
         'content-type': 'application/json; charset=utf-8',
@@ -252,7 +252,7 @@ describe('bounded JSON request parsing', () => {
   it.each([
     [{}, 'missing'],
     [{ 'content-type': 'text/plain' }, 'non-JSON']
-  ])('rejects a %s Content-Type', async (headers) => {
+  ])('rejects a Content-Type that is %s', async (headers, _description) => {
     const result = await invoke({ headers })
 
     expect(result.status).toBe(415)
@@ -268,7 +268,7 @@ describe('bounded JSON request parsing', () => {
     [null, 'object null'],
     [[], 'object array'],
     [42, 'unsupported raw type']
-  ])('rejects %s safely', async (body) => {
+  ])('rejects an invalid body safely: %s', async (body, _description) => {
     const result = await invoke({ body })
 
     expect(result.status).toBe(400)
@@ -333,7 +333,7 @@ describe('bounded JSON request parsing', () => {
     [JSON.stringify({ question: defaultQuestion, padding: 'x'.repeat(MAX_REQUEST_BODY_BYTES) }), 'raw string'],
     [Buffer.alloc(MAX_REQUEST_BODY_BYTES + 1, 32), 'raw Buffer'],
     [{ question: defaultQuestion, padding: 'x'.repeat(MAX_REQUEST_BODY_BYTES) }, 'parsed object']
-  ])('rejects an oversized %s body before use', async (body) => {
+  ])('rejects an oversized body before use: %s', async (body, _description) => {
     const result = await invoke({ body })
 
     expect(result.status).toBe(413)
@@ -467,7 +467,7 @@ describe('live OpenAI request and output contract', () => {
         /use only.*site-owned context.*never invent.*official committee position/is
       ),
       input: expect.any(String),
-      safety_identifier: expect.stringMatching(/^sha256:[a-f0-9]{64}$/)
+      safety_identifier: expect.stringMatching(/^[a-f0-9]{64}$/)
     })
     expect(String(upstream.body.input).length).toBeLessThanOrEqual(12_000)
     expect(upstream.body.input).toContain('What are the hazards of reentry?')
@@ -477,6 +477,7 @@ describe('live OpenAI request and output contract', () => {
     )
     expect(upstream.body.safety_identifier).not.toContain(rawIp)
     expect(upstream.body.safety_identifier).not.toContain(rawUserAgent)
+    expect(String(upstream.body.safety_identifier)).toHaveLength(64)
     expect(upstream.init.signal).toBeInstanceOf(AbortSignal)
 
     expect(result.status).toBe(200)
@@ -518,7 +519,7 @@ describe('live OpenAI request and output contract', () => {
     ])
     expect(bodies[0].safety_identifier).toBe(bodies[1].safety_identifier)
     expect(bodies[2].safety_identifier).not.toBe(bodies[0].safety_identifier)
-    expect(String(bodies[0].safety_identifier)).toMatch(/^sha256:[a-f0-9]{64}$/)
+    expect(String(bodies[0].safety_identifier)).toMatch(/^[a-f0-9]{64}$/)
     expect(String(bodies[0].safety_identifier)).not.toContain('192.0.2.44')
   })
 
@@ -590,9 +591,58 @@ describe('live OpenAI request and output contract', () => {
 
     expectPreviewFallback(result)
   })
+
+  it('also times out unresolved upstream JSON body consumption', async () => {
+    vi.useFakeTimers()
+    process.env.OPENAI_API_KEY = 'server-only-test-secret'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        status: 200,
+        json: vi.fn(() => new Promise<unknown>(() => undefined))
+      } as unknown as Response)
+    )
+
+    let settledResult: Invocation | undefined
+    void invoke().then((result) => {
+      settledResult = result
+    })
+    await vi.advanceTimersByTimeAsync(OPENAI_TIMEOUT_MS + 1)
+    await Promise.resolve()
+
+    expect(settledResult).toBeDefined()
+    expectPreviewFallback(settledResult as Invocation)
+  })
 })
 
 describe('bounded per-client throttling', () => {
+  it('shares one allowance for the same IP when User-Agent values change', async () => {
+    const sharedAddress = '198.51.100.87'
+
+    for (let index = 0; index < RATE_LIMIT_MAX_REQUESTS; index += 1) {
+      const allowed = await invoke({
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': sharedAddress,
+          'user-agent': `rotating-agent-${index}`
+        }
+      })
+      expect(allowed.status).toBe(200)
+    }
+
+    const limited = await invoke({
+      headers: {
+        'content-type': 'application/json',
+        'x-forwarded-for': sharedAddress,
+        'user-agent': 'rotating-agent-evasion-attempt'
+      }
+    })
+
+    expect(limited.status).toBe(429)
+    expect(limited.header('RateLimit-Remaining')).toBe('0')
+  })
+
   it('returns 429 with Retry-After and can be reset deterministically for tests', async () => {
     const headers = {
       'content-type': 'application/json',
