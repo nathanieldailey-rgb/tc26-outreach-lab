@@ -1,6 +1,6 @@
 import { expect, test, type Page } from '@playwright/test'
 
-const prototypeNotice = 'Co-chair-led prototype · committee review copy'
+const reviewPrototypeNotice = 'Co-chair-led prototype · committee review copy'
 
 const articleJourneys = [
   {
@@ -61,7 +61,7 @@ test.describe('committee-demo first view', () => {
     await expect(page.getByRole('banner')).toBeVisible()
     await expect(page.getByRole('main')).toBeVisible()
     await expect(page.getByRole('navigation', { name: 'Primary navigation' })).toBeVisible()
-    await expect(page.getByText(prototypeNotice, { exact: true })).toBeVisible()
+    await expect(page.getByText(reviewPrototypeNotice, { exact: true })).toBeVisible()
     await expect(page.getByText('20 records across volumes', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: /Ask the Committee/ })).toHaveAttribute(
       'href',
@@ -80,7 +80,7 @@ test.describe('committee-demo first view', () => {
     await page.setViewportSize({ width: 390, height: 844 })
     await openPrototype(page)
 
-    await expect(page.getByText(prototypeNotice, { exact: true })).toBeVisible()
+    await expect(page.getByText(reviewPrototypeNotice, { exact: true })).toBeVisible()
     await expect(page.getByText('20 records across volumes', { exact: true })).toBeVisible()
     await expect(page.getByRole('link', { name: /Featured reading/ })).toHaveAttribute(
       'href',
