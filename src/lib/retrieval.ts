@@ -5,6 +5,7 @@ import {
 
 const STOPWORDS = new Set([
   'a',
+  'about',
   'an',
   'and',
   'are',
@@ -12,23 +13,30 @@ const STOPWORDS = new Set([
   'at',
   'be',
   'by',
+  'can',
+  'could',
   'does',
   'do',
+  'explain',
   'for',
   'from',
   'how',
+  'i',
   'in',
   'is',
   'it',
   'important',
   'matter',
   'matters',
+  'me',
   'of',
   'on',
   'or',
   'that',
   'the',
   'this',
+  'through',
+  'tell',
   'to',
   'what',
   'when',
@@ -36,7 +44,8 @@ const STOPWORDS = new Set([
   'which',
   'who',
   'why',
-  'with'
+  'with',
+  'you'
 ])
 
 const FIELD_WEIGHTS = {
@@ -45,9 +54,19 @@ const FIELD_WEIGHTS = {
   text: 1
 } as const
 
-const MINIMUM_QUERY_COVERAGE = 0.5
 const MINIMUM_RELEVANCE_SCORE = 8
-const MAXIMUM_COVERAGE_TOKEN_COUNT = 3
+
+const QUERY_TERM_EQUIVALENTS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  affect: ['links'],
+  atmosphere: ['reentry'],
+  changes: ['extend'],
+  falling: ['reentry'],
+  ordinary: ['public'],
+  people: ['public'],
+  satellite: ['spacecraft']
+}
 
 export type RetrievalResult = KnowledgeEntry & {
   score: number
@@ -80,8 +99,19 @@ function scoreEntry(
     const titleScore = titleTokens.has(token) ? FIELD_WEIGHTS.title : 0
     const keywordScore = keywordTokens.has(token) ? FIELD_WEIGHTS.keywords : 0
     const textScore = textTokens.has(token) ? FIELD_WEIGHTS.text : 0
+    const equivalentMatch = (QUERY_TERM_EQUIVALENTS[token] ?? []).some(
+      (equivalentToken) =>
+        titleTokens.has(equivalentToken) ||
+        keywordTokens.has(equivalentToken) ||
+        textTokens.has(equivalentToken)
+    )
 
-    if (titleScore > 0 || keywordScore > 0 || textScore > 0) {
+    if (
+      titleScore > 0 ||
+      keywordScore > 0 ||
+      textScore > 0 ||
+      equivalentMatch
+    ) {
       matchedTokenCount += 1
     }
 
@@ -108,25 +138,12 @@ export function retrieveKnowledge(
       index,
       ...scoreEntry(queryTokens, entry)
     }))
-    .filter(({ score }) => score >= MINIMUM_RELEVANCE_SCORE)
+    .filter(
+      ({ matchedTokenCount, score }) =>
+        matchedTokenCount === queryTokens.length &&
+        score >= MINIMUM_RELEVANCE_SCORE
+    )
     .sort((left, right) => right.score - left.score || left.index - right.index)
-
-  const strongestResult = ranked[0]
-  const coverageTokenCount = Math.min(
-    queryTokens.length,
-    MAXIMUM_COVERAGE_TOKEN_COUNT
-  )
-  const queryCoverage =
-    (strongestResult?.matchedTokenCount ?? 0) / coverageTokenCount
-  const minimumMatchedTokenCount = queryTokens.length === 1 ? 1 : 2
-
-  if (
-    queryCoverage < MINIMUM_QUERY_COVERAGE ||
-    (strongestResult?.matchedTokenCount ?? 0) < minimumMatchedTokenCount ||
-    (strongestResult?.score ?? 0) < MINIMUM_RELEVANCE_SCORE
-  ) {
-    return []
-  }
 
   return ranked.slice(0, resultLimit).map(({ entry, score }) => ({
     ...entry,

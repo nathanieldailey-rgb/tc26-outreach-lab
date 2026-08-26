@@ -69,7 +69,7 @@ describe('knowledge retrieval', () => {
   })
 
   it('preserves each ranked entry\'s complete declared source provenance', () => {
-    const results = retrieveKnowledge('outreach committee mission', 5)
+    const results = retrieveKnowledge('public outreach', 5)
     const declaredBySlug = new Map(
       knowledgeEntries.map((entry) => [entry.slug, entry.sourceSlugs])
     )
@@ -122,7 +122,7 @@ describe('deterministic preview composition', () => {
   })
 
   it('de-duplicates sources only in final preview citation composition', () => {
-    const results = retrieveKnowledge('outreach committee mission', 5)
+    const results = retrieveKnowledge('public outreach', 5)
     const preview = composePreviewAnswer(results)
 
     expect(results.flatMap(({ sourceSlugs }) => sourceSlugs)).toEqual([
