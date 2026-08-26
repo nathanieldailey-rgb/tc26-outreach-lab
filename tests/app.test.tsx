@@ -1,5 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
 
 import App from '../src/App'
 
@@ -35,11 +37,94 @@ describe('editorial application', () => {
     const main = screen.getByRole('main')
     expect(within(main).getByText('20', { selector: '[data-record-count]' })).toBeVisible()
     expect(within(main).getByRole('link', { name: /ask the committee/i })).toBeVisible()
+    const researchDesk = screen.getByRole('heading', { level: 1 }).closest('section')
+    expect(researchDesk).not.toBeNull()
+    expect(
+      within(researchDesk as HTMLElement).getByRole('link', { name: /featured reading/i })
+    ).toBeVisible()
+    expect(
+      within(researchDesk as HTMLElement).getByRole('link', { name: /20 records across volumes/i })
+    ).toBeVisible()
+    expect(
+      within(researchDesk as HTMLElement).getByRole('link', { name: /videos.*studio/i })
+    ).toBeVisible()
     expect(
       within(main).getByRole('heading', {
         name: 'Outreach is part of the safety architecture'
       })
     ).toBeVisible()
+  })
+
+  it('transfers a first-view question into Ask and focuses it without a request', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    const researchDesk = screen.getByRole('heading', { level: 1 }).closest('section')
+    if (!researchDesk) throw new Error('Research desk section was not found')
+
+    const starterForm = within(researchDesk).getByRole('form', {
+      name: /start an ask the committee question/i
+    })
+    const starterInput = within(starterForm).getByRole('textbox', {
+      name: /start with a question/i
+    })
+    const askSection = sectionNamed(/ask the committee/i)
+    const scrollIntoView = vi.fn()
+    askSection.scrollIntoView = scrollIntoView
+
+    await user.type(starterInput, 'How do shared catalogs support coordination?')
+    await user.click(
+      within(starterForm).getByRole('button', { name: /take this question to ask/i })
+    )
+
+    const askInput = within(askSection).getByRole('textbox', { name: /your question/i })
+    expect(askInput).toHaveValue('How do shared catalogs support coordination?')
+    expect(askInput).toHaveFocus()
+    expect(scrollIntoView).toHaveBeenCalledTimes(1)
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('keeps a blank first-view question in place with accessible validation', async () => {
+    const user = userEvent.setup()
+    const fetchMock = vi.fn()
+    vi.stubGlobal('fetch', fetchMock)
+    render(<App />)
+
+    const researchDesk = screen.getByRole('heading', { level: 1 }).closest('section')
+    if (!researchDesk) throw new Error('Research desk section was not found')
+
+    const starterForm = within(researchDesk).getByRole('form', {
+      name: /start an ask the committee question/i
+    })
+    const starterInput = within(starterForm).getByRole('textbox', {
+      name: /start with a question/i
+    })
+
+    await user.click(
+      within(starterForm).getByRole('button', { name: /take this question to ask/i })
+    )
+
+    expect(starterInput).toHaveAttribute('aria-invalid', 'true')
+    expect(starterInput).toHaveFocus()
+    expect(within(starterForm).getByRole('status')).toHaveTextContent(
+      /enter a question to continue/i
+    )
+    expect(
+      within(sectionNamed(/ask the committee/i)).getByRole('textbox', {
+        name: /your question/i
+      })
+    ).toHaveValue('')
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
+  it('declares an embedded favicon that cannot trigger a page-load request', () => {
+    const documentSource = readFileSync(resolve(process.cwd(), 'index.html'), 'utf8')
+
+    expect(documentSource).toMatch(
+      /<link\s+[^>]*rel=["']icon["'][^>]*href=["']data:image\//i
+    )
   })
 
   it('shows the complete featured article and DOI-backed source pathways', () => {
