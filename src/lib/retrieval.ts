@@ -1,7 +1,7 @@
 import {
   knowledgeEntries,
   type KnowledgeEntry
-} from '../content/knowledge'
+} from '../content/knowledge.js'
 
 const STOPWORDS = new Set([
   'a',

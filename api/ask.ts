@@ -3,13 +3,17 @@ import { createHash } from 'node:crypto'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
 
-import { doiUrl, publications, type Publication } from '../src/content/publications'
+import {
+  doiUrl,
+  publications,
+  type Publication
+} from '../src/content/publications.js'
 import {
   collectSourceSlugs,
   composePreviewAnswer,
   retrieveKnowledge,
   type RetrievalResult
-} from '../src/lib/retrieval'
+} from '../src/lib/retrieval.js'
 
 type RequestHeaderValue = string | string[] | number | undefined
 
