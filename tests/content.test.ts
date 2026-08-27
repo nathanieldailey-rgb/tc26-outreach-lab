@@ -53,7 +53,10 @@ function isApprovedPublicRepositoryUrl(candidate: string): boolean {
   }
 
   const suffix = url.pathname.slice(approvedPath.length)
-  return /^\/(?:issues|pull)(?:\/|$)/.test(suffix)
+  return (
+    /^\/(?:issues|pull)(?:\/|$)/.test(suffix) ||
+    suffix === '/blob/main/CONTENT_POLICY.md'
+  )
 }
 
 function collectSourceControlUrls(source: string): string[] {
@@ -457,7 +460,7 @@ describe('clean-room public source boundary', () => {
     }
   })
 
-  it('allows only the designated public repository base and issue or pull routes', () => {
+  it('allows only the designated repository, collaboration routes, and content policy', () => {
     const approvedPathLength = new URL(approvedRepositoryBase).pathname.length
     const unrelatedSameLengthPath = `/${'x'.repeat(approvedPathLength - 1)}`
     const approvedUrls = [
@@ -466,10 +469,13 @@ describe('clean-room public source boundary', () => {
       `${approvedRepositoryBase}/issues`,
       `${approvedRepositoryBase}/issues/new?template=article`,
       `${approvedRepositoryBase}/pull/42#discussion`,
+      `${approvedRepositoryBase}/blob/main/CONTENT_POLICY.md`,
       `${approvedRepositoryBase}?tab=readme`
     ]
     const rejectedUrls = [
       `${approvedRepositoryBase}/actions`,
+      `${approvedRepositoryBase}/blob/main/README.md`,
+      `${approvedRepositoryBase}/blob/review/CONTENT_POLICY.md`,
       `${approvedRepositoryBase}:443`,
       ['https://', 'github.com', unrelatedSameLengthPath, '/issues'].join(''),
       ['https://', 'github.com/another-owner/another-repository'].join(''),

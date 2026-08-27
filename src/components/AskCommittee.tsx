@@ -143,9 +143,11 @@ export default function AskCommittee({
       setStatus('Answer ready. Sources and mode are shown below.')
     } catch {
       setRequestError(
-        'The Ask service is not available in this interface-only prototype yet. The source-bounded API arrives in Task 3; no answer has been generated.'
+        'The Ask service is temporarily unavailable. Retry in a moment. No answer was generated.'
       )
-      setStatus('Request could not be completed. No answer was generated.')
+      setStatus(
+        'Service unavailable. Retry in a moment; no answer was generated.'
+      )
     } finally {
       requestInFlight.current = false
       onBusyChange(false)

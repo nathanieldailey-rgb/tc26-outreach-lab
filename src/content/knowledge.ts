@@ -125,7 +125,7 @@ export const knowledgeEntries: readonly KnowledgeEntry[] = [
     slug: 'future-domains',
     title: 'Future domains from sub-orbital activity to Moon and Mars',
     text:
-      'The future-domains records extend the traffic conversation through sub-orbital transit and ground support, growing activity in near-Earth space, and cislunar and cismartian environments. The titles establish scope; the linked papers remain the source for detailed frameworks or findings.',
+      'The future-domains records extend the space traffic management conversation through sub-orbital transit and ground support, growing activity in near-Earth space, and cislunar and cismartian environments. The titles establish scope; the linked papers remain the source for detailed frameworks or findings.',
     keywords: [
       'future domains',
       'sub-orbital',

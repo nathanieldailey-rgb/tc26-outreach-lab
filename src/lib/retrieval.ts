@@ -32,6 +32,7 @@ const STOPWORDS = new Set([
   'of',
   'on',
   'or',
+  'part',
   'that',
   'the',
   'this',
@@ -61,6 +62,7 @@ const QUERY_TERM_EQUIVALENTS: Readonly<
 > = {
   affect: ['links'],
   atmosphere: ['reentry'],
+  change: ['extend'],
   changes: ['extend'],
   falling: ['reentry'],
   ordinary: ['public'],

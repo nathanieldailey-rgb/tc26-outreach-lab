@@ -11,7 +11,7 @@ The full run works from a **verified deployed preview** without an API key. In t
 ## Before the room joins
 
 1. Run `npm ci`, `npm test -- --run`, and `npm run build` on the demo branch.
-2. Open the verified deployed preview URL created during Task 5 and confirm that the Ask endpoint returns preview mode.
+2. Open the verified deployed preview URL prepared for this demonstration and confirm that the Ask endpoint returns preview mode.
 3. Leave `ASK_LIVE_ENABLED=false` and `OPENAI_API_KEY` empty for the safest repeatable path. If live mode has already been configured on that preview, confirm the exact-origin allowlist, durable Redis limits, dedicated project key and budget control before the meeting; never weaken those controls just for the demonstration.
 4. Open the repository contribution page in a second tab.
 5. Keep a static screenshot of the research desk available in case the display connection fails.

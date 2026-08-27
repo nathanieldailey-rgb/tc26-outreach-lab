@@ -26,7 +26,7 @@ npm run dev
 
 Open the local URL printed by Vite to review the editorial interface. This plain Vite server is UI-only: its `/api/ask` function is not available, so Ask submissions cannot complete in this mode.
 
-Run the **full demonstration from a deployed preview** that includes the serverless function. On that preview, leaving `OPENAI_API_KEY` empty is intentional: the endpoint returns a visibly labeled deterministic preview mode answer. Task 5 of the implementation plan creates and verifies that preview before a meeting.
+Run the **full demonstration from a deployed preview** that includes the serverless function. On that preview, leaving `OPENAI_API_KEY` empty is intentional: the endpoint returns a visibly labeled deterministic preview mode answer. Verify the preview and its Ask response before a meeting.
 
 ### Ask modes on a deployed preview
 
@@ -53,7 +53,16 @@ npm run test:coverage
 npm run build
 ```
 
-The GitHub workflow repeats installation, the full test suite, coverage, and the production build on Node 24. Browser journeys join the workflow when the Playwright configuration is present.
+Install Playwright's bundled Chromium once, then run the nine browser journeys:
+
+```bash
+npx playwright install chromium
+npm run test:e2e
+```
+
+If a compatible Chromium installation is already available, `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` may optionally point to that executable for `npm run test:e2e`. Keep the machine-specific value in the shell; do not commit a local path.
+
+The GitHub workflow repeats installation, the full test suite, coverage, the production build, Chromium installation, and the browser journeys on Node 24.
 
 ## Collaborate
 

@@ -532,7 +532,7 @@ main > section {
 
 .article-selector label,
 .library-controls label,
-.ask-committee form > label,
+.committee-query form > label,
 .storyboard__timeline label {
   display: block;
   margin-bottom: 0.45rem;
@@ -1624,6 +1624,11 @@ textarea {
   color: var(--paper-light);
   font-family: var(--display);
   font-size: 1.15rem;
+}
+
+.site-footer a {
+  color: var(--paper-light);
+  font-weight: 700;
 }
 
 @media (max-width: 68rem) {

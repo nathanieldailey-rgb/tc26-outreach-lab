@@ -3,60 +3,60 @@ import { useEffect, useState } from 'react'
 const videoBriefs = [
   {
     number: '01',
-    title: 'One domain, many handoffs',
-    duration: '90 seconds',
-    audience: 'Public and policy audiences',
+    title: 'Outreach Is Part of the Safety Architecture',
+    duration: '75 seconds',
+    audience: 'Students, public communicators, policy staff, and new operators',
     description:
-      'Follow one vehicle from ground support through airspace and into an orbital environment, making each coordination responsibility visible.'
+      'Show how shared understanding and feedback affect the quality of space-traffic decisions. This first concept is represented by the interactive storyboard below.'
   },
   {
     number: '02',
-    title: 'What makes an orbital picture shared?',
-    duration: '2 minutes',
-    audience: 'Students and operational readers',
+    title: 'Reentry Does Not End at an Orbital Boundary',
+    duration: '80 seconds',
+    audience: 'Public-safety officials, regulators, journalists, and interested residents',
     description:
-      'Separate precision, data fusion, and catalog access so a shared picture is not mistaken for a single database or a claim of perfect agreement.'
+      'Show why reentry connects orbital knowledge with terrestrial coordination while distinguishing known facts, uncertainty, and the next update.'
   },
   {
     number: '03',
-    title: 'The traffic map grows outward',
-    duration: '2 minutes',
-    audience: 'Emerging-space practitioners',
+    title: 'Traffic Management Beyond Earth Orbit',
+    duration: '75 seconds',
+    audience: 'Program leaders, emerging-space practitioners, educators, and the public',
     description:
-      'Move from sub-orbital transit to near-Earth growth and Moon-to-Mars activity while keeping the differences among operating contexts explicit.'
+      'Introduce the coordination questions that grow as missions move from Earth orbit toward the Moon and Mars.'
   }
 ] as const
 
 const storyboardFrames = [
   {
-    marker: 'Observe',
-    title: 'A shared domain comes into view',
+    marker: 'Share',
+    title: 'One environment. Many decisions.',
     text:
-      'Different participants first need a legible picture of what is moving, where uncertainty remains, and which information supports a decision.'
+      'Space traffic management is a coordination problem shared by people with different roles, responsibilities, and information.'
   },
   {
-    marker: 'Relate',
-    title: 'Individual tracks become a traffic picture',
+    marker: 'Translate',
+    title: 'Evidence becomes meaning, then action',
     text:
-      'Precision, identification, fusion, and catalog access are connected layers. None alone guarantees that every participant sees the same meaning.'
+      'A warning works only when its meaning survives the handoffs from sensors to operators, and from specialists to decision makers and the public.'
   },
   {
-    marker: 'Coordinate',
-    title: 'Knowledge moves toward operational action',
+    marker: 'Listen',
+    title: 'Outreach is a feedback loop',
     text:
-      'Warnings, collision avoidance, servicing, reentry, and spectrum concerns introduce different actions, timelines, and operational handoffs.'
+      'Questions and misunderstandings reveal where terms, assumptions, and procedures need clarification; outreach is more than broadcasting.'
   },
   {
-    marker: 'Govern',
-    title: 'Responsibilities have to remain visible',
+    marker: 'Source',
+    title: 'Send readers to the full work',
     text:
-      'Registration, technical rules, compliance, and capacity questions show that traffic management is institutional as well as technical.'
+      'Good outreach identifies its sources and guides readers to the committee publication record instead of replacing the technical papers.'
   },
   {
-    marker: 'Explain',
-    title: 'Public understanding closes the loop',
+    marker: 'Invite',
+    title: 'Ask. Read. Contribute.',
     text:
-      'Outreach helps readers locate evidence, distinguish interpretation from findings, and enter the conversation without inventing consensus.'
+      'A stronger traffic community can understand the evidence, question interpretations, and help improve what comes next.'
   }
 ] as const
 
@@ -128,8 +128,8 @@ export default function ExplainerStudio() {
           <h2 id="studio-title">Make the operating picture move</h2>
         </div>
         <p className="section-standfirst">
-          Three production-ready briefs and one committee-demo storyboard translate the
-          publication map without reproducing paper content.
+          Three concepts total: one interactive storyboard plus two additional briefs.
+          The storyboard represents the first Outreach concept; it is not a fourth idea.
         </p>
       </div>
 
@@ -166,7 +166,9 @@ export default function ExplainerStudio() {
         }
       >
         <div className="storyboard__copy">
-          <p className="eyebrow">Interactive brief / outreach as infrastructure</p>
+          <p className="eyebrow">
+            Concept 1 · interactive storyboard / Outreach Is Part of the Safety Architecture
+          </p>
           <h3 id="storyboard-title">Interactive explainer storyboard</h3>
           <p id="storyboard-instructions">
             Play at your pace, move one frame at a time, or use the labeled timeline.

@@ -589,7 +589,7 @@ describe('editorial application', () => {
     const links = screen.getAllByRole('link').filter((link) =>
       link.getAttribute('href')?.startsWith(repositoryUrl)
     )
-    expect(links).toHaveLength(5)
+    expect(links).toHaveLength(6)
 
     for (const link of links) {
       expect(link.getAttribute('href')).toMatch(

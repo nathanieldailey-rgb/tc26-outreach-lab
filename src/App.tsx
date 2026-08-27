@@ -8,6 +8,9 @@ import Header from './components/Header'
 import PublicationLibrary from './components/PublicationLibrary'
 import ResearchDesk from './components/ResearchDesk'
 
+const contentPolicyUrl =
+  'https://github.com/nathanieldailey-rgb/tc26-outreach-lab/blob/main/CONTENT_POLICY.md'
+
 export default function App() {
   const [question, setQuestion] = useState('')
   const [isAskBusy, setIsAskBusy] = useState(false)
@@ -50,8 +53,16 @@ export default function App() {
             Project-original public interpretation and bibliographic navigation. Publisher
             papers remain authoritative for their own findings.
           </p>
+          <p>© 2026 Dr. Nate Dailey and TC26 Outreach Lab contributors.</p>
         </div>
         <div>
+          <p>Source code is available under the MIT License.</p>
+          <p>
+            Editorial and media content: rights reserved pending a committee decision.{' '}
+            <a href={contentPolicyUrl} target="_blank" rel="noopener noreferrer">
+              Read the content and rights policy <span aria-hidden="true">↗</span>
+            </a>
+          </p>
           <p>No institutional logos or marks are used.</p>
           <p>Generated answers are not an official committee position.</p>
           <p>Prototype for review; no formal adoption or endorsement is claimed.</p>
