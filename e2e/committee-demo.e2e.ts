@@ -1,4 +1,23 @@
-import { expect, test, type Page } from '@playwright/test'
+import { expect, test as base, type Page } from '@playwright/test'
+
+import askHandler, { type ApiRequest, type ApiResponse } from '../api/ask'
+import {
+  expectNoBrowserErrors,
+  observeBrowserErrors,
+  type BrowserErrorMonitor
+} from './support/browser-errors'
+
+const test = base.extend<{ browserErrorMonitor: BrowserErrorMonitor }>({
+  browserErrorMonitor: [
+    async ({ page }, use) => {
+      const monitor = observeBrowserErrors(page)
+      await use(monitor)
+      monitor.detach()
+      expectNoBrowserErrors(monitor.errors)
+    },
+    { auto: true }
+  ]
+})
 
 const reviewPrototypeNotice = 'Co-chair-led prototype · committee review copy'
 
@@ -27,6 +46,41 @@ const articleJourneys = [
     ]
   }
 ] as const
+
+async function invokePreviewAsk(question: string): Promise<{
+  status: number
+  body: unknown
+}> {
+  let status = 200
+  let body: unknown
+  const response: ApiResponse = {
+    status(code) {
+      status = code
+      return response
+    },
+    setHeader() {
+      return response
+    },
+    json(payload) {
+      body = payload
+    },
+    end(payload) {
+      body = payload
+    }
+  }
+  const request: ApiRequest = {
+    method: 'POST',
+    headers: {
+      'content-type': 'application/json',
+      'user-agent': 'playwright-grounded-preview',
+      'x-forwarded-for': '192.0.2.90'
+    },
+    body: { question }
+  }
+
+  await askHandler(request, response)
+  return { status, body }
+}
 
 async function openPrototype(page: Page): Promise<void> {
   await page.goto('/')
@@ -151,7 +205,6 @@ test('renders a source-bounded preview and preserves the submitted question', as
   const question = 'Why is outreach part of space traffic management?'
   const sourceTitle = 'Outreach on Space Traffic Management'
   const sourceHref = 'https://doi.org/10.1016/j.actaastro.2025.01.031'
-  const notice = 'Preview answer from project-owned public context; not an official position.'
   let postedBody: unknown
 
   await page.route('**/api/ask', async (route) => {
@@ -159,16 +212,24 @@ test('renders a source-bounded preview and preserves the submitted question', as
     expect(request.method()).toBe('POST')
     expect(request.headers()['content-type']).toContain('application/json')
     postedBody = request.postDataJSON()
+    const submittedQuestion = (postedBody as { question?: unknown }).question
+    expect(submittedQuestion).toBe(question)
+    const apiResponse = await invokePreviewAsk(String(submittedQuestion))
+    const payload = apiResponse.body as {
+      answer?: unknown
+      mode?: unknown
+      sources?: unknown[]
+      notice?: unknown
+    }
+
+    expect(apiResponse.status).toBe(200)
+    expect(payload.answer).toMatch(/^Preview answer — site-owned material only:/)
+    expect(payload.mode).toBe('preview')
+    expect(payload.sources?.length).toBeGreaterThan(0)
     await route.fulfill({
-      status: 200,
+      status: apiResponse.status,
       contentType: 'application/json',
-      body: JSON.stringify({
-        answer:
-          'Outreach connects public understanding to the technical record while keeping interpretation distinct from paper findings.',
-        mode: 'preview',
-        sources: [{ title: sourceTitle, href: sourceHref }],
-        notice
-      })
+      body: JSON.stringify(apiResponse.body)
     })
   })
 
@@ -179,12 +240,16 @@ test('renders a source-bounded preview and preserves the submitted question', as
   await expect.poll(() => postedBody).toEqual({ question })
   await expect(page.getByText('Deterministic preview mode', { exact: true })).toBeVisible()
   await expect(page.getByRole('blockquote')).toHaveText(question)
-  await expect(page.locator('.answer__text')).toContainText('Outreach connects')
+  await expect(page.locator('.answer__text')).toContainText(
+    'Preview answer — site-owned material only'
+  )
   await expect(page.locator('.answer').getByRole('link', { name: sourceTitle, exact: true })).toHaveAttribute(
     'href',
     sourceHref
   )
-  await expect(page.getByText(notice, { exact: true })).toBeVisible()
+  await expect(page.locator('.answer__notice')).toContainText(
+    'Deterministic preview mode uses site-owned public context only.'
+  )
 })
 
 test('coordinates all question controls while an Ask request is loading', async ({

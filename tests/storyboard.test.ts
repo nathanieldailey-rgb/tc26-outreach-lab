@@ -58,12 +58,21 @@ describe('Explainer Studio storyboard', () => {
   it('presents three video briefs and a five-frame storyboard that never auto-plays', () => {
     render(createElement(ExplainerStudio))
 
-    expect(
-      within(screen.getByRole('list', { name: /explainer video briefs/i })).getAllByRole(
-        'listitem'
-      )
-    ).toHaveLength(3)
+    const slate = screen.getByRole('list', { name: /explainer video briefs/i })
+    const concepts = within(slate).getAllByRole('listitem')
+
+    expect(concepts).toHaveLength(3)
+    expect(concepts[0]).toHaveTextContent('Outreach Is Part of the Safety Architecture')
+    expect(concepts[0]).toHaveTextContent('75 seconds')
+    expect(concepts[1]).toHaveTextContent('Reentry Does Not End at an Orbital Boundary')
+    expect(concepts[1]).toHaveTextContent('80 seconds')
+    expect(concepts[2]).toHaveTextContent('Traffic Management Beyond Earth Orbit')
+    expect(concepts[2]).toHaveTextContent('75 seconds')
+    expect(screen.getByText(/three concepts total/i)).toBeVisible()
+    expect(screen.getByText(/one interactive storyboard plus two additional briefs/i)).toBeVisible()
+    expect(within(player()).getByText(/concept 1.*interactive storyboard/i)).toBeVisible()
     expect(within(player()).getByText(/frame 1 of 5/i)).toBeVisible()
+    expect(within(player()).getByText('One environment. Many decisions.')).toBeVisible()
     expect(within(player()).getByRole('button', { name: /play storyboard/i })).toBeVisible()
 
     act(() => vi.advanceTimersByTime(10_500))

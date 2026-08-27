@@ -68,8 +68,12 @@ describe('public collaboration package', () => {
       /npm run dev/,
       /npm test -- --run/,
       /npm run test:coverage/,
-      /npm run build/
+      /npm run build/,
+      /npx playwright install chromium/,
+      /npm run test:e2e/,
+      /PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH/
     ])
+    expect(readme).not.toMatch(/Task\s*5/i)
     expect(readme).toContain(repositoryUrl)
   })
 
@@ -90,6 +94,7 @@ describe('public collaboration package', () => {
       /verified (?:deployed )?preview/i,
       /plain Vite[\s\S]{0,240}(?:does not|cannot)[\s\S]{0,120}\/api\/ask/i
     ])
+    expect(runbook).not.toMatch(/Task\s*5/i)
   })
 
   it('creates two distinct issue lanes and a reviewable pull-request path', () => {
@@ -205,6 +210,9 @@ describe('public collaboration package', () => {
     const concepts = briefs.split(/^## Concept \d+:/m).slice(1)
 
     expect(concepts).toHaveLength(3)
+    expect(briefs).toMatch(/Concept 1: Outreach Is Part of the Safety Architecture[\s\S]*?Duration:\s*75 seconds/i)
+    expect(briefs).toMatch(/Concept 2: Reentry Does Not End at an Orbital Boundary[\s\S]*?Duration:\s*80 seconds/i)
+    expect(briefs).toMatch(/Concept 3: Traffic Management Beyond Earth Orbit[\s\S]*?Duration:\s*75 seconds/i)
     for (const concept of concepts) {
       expectAll(concept, [
         /Duration:\s*(?:6\d|7\d|8\d|90) seconds/i,
@@ -230,6 +238,13 @@ describe('public collaboration package', () => {
       /npm run test:e2e/,
       /permissions:\s*\n\s+contents:\s*read/i
     ])
+  })
+
+  it('makes browser journeys fail on uncaught page and error-level console events', () => {
+    const journey = read('e2e/committee-demo.e2e.ts')
+
+    expect(journey).toMatch(/observeBrowserErrors\(page\)/)
+    expect(journey).toMatch(/expectNoBrowserErrors/)
   })
 })
 
@@ -276,12 +291,16 @@ describe('clean-room repository policy', () => {
   it('uses only the designated repository in collaboration artifacts', () => {
     const sourceControlReference = /(?:https?:\/\/[^\s"'`)<>{\]]*(?:github|gitlab)[^\s"'`)<>{\]]*|ssh:\/\/[^\s"'`)<>{\]]+|git@[^\s:"'`)<>{\]]+:[^\s"'`)<>{\]]+)/gi
 
-    for (const relativePath of requiredFiles) {
+    for (const relativePath of [
+      ...requiredFiles,
+      'src/App.tsx',
+      'src/components/Contribute.tsx'
+    ]) {
       const urls = read(relativePath).match(sourceControlReference) ?? []
 
       for (const url of urls) {
         expect(url, `${relativePath}: ${url}`).toMatch(
-          /^https:\/\/github\.com\/nathanieldailey-rgb\/tc26-outreach-lab(?:$|\/(?:issues|pull)(?:\/|$))/
+          /^https:\/\/github\.com\/nathanieldailey-rgb\/tc26-outreach-lab(?:$|\/(?:issues|pull)(?:\/|$)|\/blob\/main\/CONTENT_POLICY\.md$)/
         )
       }
     }

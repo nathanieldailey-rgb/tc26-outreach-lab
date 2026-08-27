@@ -545,7 +545,7 @@ describe('editorial application', () => {
     }
   )
 
-  it('gives a transparent interface-only error before the Ask API exists', async () => {
+  it('gives truthful retry guidance when the current Ask service is unavailable', async () => {
     const user = userEvent.setup()
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('Failed to fetch')))
     render(<App />)
@@ -557,22 +557,45 @@ describe('editorial application', () => {
     )
     await user.click(within(ask).getByRole('button', { name: /ask this question/i }))
 
-    expect(
-      await within(ask).findByText(/ask service is not available in this interface-only prototype/i)
-    ).toBeVisible()
-    expect(within(ask).getByRole('status')).toHaveTextContent(/request could not be completed/i)
+    const error = await within(ask).findByText(/ask service is temporarily unavailable/i)
+
+    expect(error).toHaveTextContent(/retry/i)
+    expect(error).toHaveTextContent(/no answer was generated/i)
+    expect(error).not.toHaveTextContent(/task 3|interface-only prototype/i)
+    expect(within(ask).getByRole('status')).toHaveTextContent(
+      /service unavailable.*retry.*no answer was generated/i
+    )
   })
 
-  it('limits contribution links to the approved public repository and issue/pull paths', () => {
+  it('renders the copyright and editorial-rights boundary with a usable policy link', () => {
+    render(<App />)
+
+    const footer = screen.getByRole('contentinfo')
+    expect(within(footer).getByText(/\u00a9 2026 Dr\. Nate Dailey and TC26 Outreach Lab contributors/i)).toBeVisible()
+    expect(within(footer).getByText(/editorial and media content.*rights reserved pending a committee decision/i)).toBeVisible()
+    expect(within(footer).getByText(/source code.*MIT License/i)).toBeVisible()
+    expect(within(footer).getByRole('link', { name: /content and rights policy/i })).toHaveAttribute(
+      'href',
+      `${repositoryUrl}/blob/main/CONTENT_POLICY.md`
+    )
+  })
+
+  it('limits public source-control links to the approved repository paths', () => {
     render(<App />)
 
     const contribute = sectionNamed(/contribute to the prototype/i)
-    const links = within(contribute).getAllByRole('link')
-    expect(links).toHaveLength(4)
+    expect(within(contribute).getAllByRole('link')).toHaveLength(4)
+
+    const links = screen.getAllByRole('link').filter((link) =>
+      link.getAttribute('href')?.startsWith(repositoryUrl)
+    )
+    expect(links).toHaveLength(5)
 
     for (const link of links) {
       expect(link.getAttribute('href')).toMatch(
-        new RegExp(`^${repositoryUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|/(?:issues|pull)(?:/|$))`)
+        new RegExp(
+          `^${repositoryUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|/(?:issues|pull)(?:/|$)|/blob/main/CONTENT_POLICY\\.md$)`
+        )
       )
     }
     expect(within(contribute).getByText(/article lane/i)).toBeVisible()
@@ -591,5 +614,12 @@ describe('editorial application', () => {
     expect(contrastRatio(signalOrange as string, deepPaper as string)).toBeGreaterThanOrEqual(
       4.5
     )
+  })
+
+  it('styles the current Ask form label selector and removes the dead predecessor', () => {
+    const styleSource = readFileSync(resolve(process.cwd(), 'src/styles.css'), 'utf8')
+
+    expect(styleSource).toMatch(/\.committee-query\s+form\s*>\s*label/)
+    expect(styleSource).not.toMatch(/\.ask-committee\s+form\s*>\s*label/)
   })
 })

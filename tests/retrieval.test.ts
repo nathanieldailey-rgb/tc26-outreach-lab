@@ -24,6 +24,30 @@ describe('knowledge retrieval', () => {
 
   it.each([
     [
+      'Why is outreach part of space traffic management?',
+      'committee-mission'
+    ],
+    ['What are the hazards of reentry?', 'operations-reentry-cola'],
+    [
+      'How does traffic management change from Moon to Mars?',
+      'future-domains'
+    ]
+  ])(
+    'grounds the displayed Ask sample in coherent public context: %s',
+    (question, expectedSlug) => {
+      const results = retrieveKnowledge(question)
+      const preview = composePreviewAnswer(results)
+
+      expect(results.length).toBeGreaterThan(0)
+      expect(results[0]?.slug).toBe(expectedSlug)
+      expect(collectSourceSlugs(results).length).toBeGreaterThan(0)
+      expect(preview).toMatch(/^Preview answer — site-owned material only:/)
+      expect(preview).not.toBe(insufficientPreview)
+    }
+  )
+
+  it.each([
+    [
       'Could you explain why public outreach matters to ordinary people?',
       ['outreach-rationale', 'committee-mission']
     ],

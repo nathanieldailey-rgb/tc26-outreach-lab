@@ -492,6 +492,40 @@ describe('source-bounded preview behavior', () => {
     }
   })
 
+  it.each([
+    'Why is outreach part of space traffic management?',
+    'What are the hazards of reentry?',
+    'How does traffic management change from Moon to Mars?'
+  ])(
+    'returns a grounded preview and canonical sources for the displayed sample: %s',
+    async (question) => {
+      const result = await invoke({
+        body: { question },
+        headers: {
+          'content-type': 'application/json',
+          'x-forwarded-for': `203.0.113.${question.length}`,
+          'user-agent': 'displayed-sample-integration-test'
+        }
+      })
+      const payload = result.body as {
+        answer: string
+        mode: string
+        sources: Array<{ title: string; href: string }>
+      }
+
+      expect(result.status).toBe(200)
+      expect(payload.mode).toBe('preview')
+      expect(payload.answer).toMatch(/^Preview answer — site-owned material only:/)
+      expect(payload.sources.length).toBeGreaterThan(0)
+      for (const source of payload.sources) {
+        expect(source.title.trim()).not.toBe('')
+        expect(source.href).toMatch(
+          /^https:\/\/doi\.org\/10\.\d{4,9}\/[A-Za-z0-9._;()/:-]+$/
+        )
+      }
+    }
+  )
+
   it('returns a transparent insufficient-context preview and never calls the model', async () => {
     process.env.OPENAI_API_KEY = 'server-only-test-secret'
     const fetchMock = vi.fn()
