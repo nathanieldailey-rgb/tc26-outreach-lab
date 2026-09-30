@@ -28,7 +28,9 @@ const originalEnvironment = {
   openAiApiKey: process.env.OPENAI_API_KEY,
   openAiModel: process.env.OPENAI_MODEL,
   upstashRedisRestToken: process.env.UPSTASH_REDIS_REST_TOKEN,
-  upstashRedisRestUrl: process.env.UPSTASH_REDIS_REST_URL
+  upstashRedisRestUrl: process.env.UPSTASH_REDIS_REST_URL,
+  kvRestApiUrl: process.env.KV_REST_API_URL,
+  kvRestApiToken: process.env.KV_REST_API_TOKEN
 }
 
 const defaultQuestion = 'Why does outreach matter?'
@@ -40,7 +42,9 @@ function restoreEnvironment(
     | 'OPENAI_API_KEY'
     | 'OPENAI_MODEL'
     | 'UPSTASH_REDIS_REST_TOKEN'
-    | 'UPSTASH_REDIS_REST_URL',
+    | 'UPSTASH_REDIS_REST_URL'
+    | 'KV_REST_API_URL'
+    | 'KV_REST_API_TOKEN',
   value: string | undefined
 ) {
   if (value === undefined) {
@@ -195,6 +199,8 @@ beforeEach(() => {
   delete process.env.OPENAI_MODEL
   delete process.env.UPSTASH_REDIS_REST_TOKEN
   delete process.env.UPSTASH_REDIS_REST_URL
+  delete process.env.KV_REST_API_URL
+  delete process.env.KV_REST_API_TOKEN
 })
 
 afterEach(() => {
@@ -208,6 +214,8 @@ afterAll(() => {
   restoreEnvironment('ASK_LIVE_ENABLED', originalEnvironment.askLiveEnabled)
   restoreEnvironment('OPENAI_API_KEY', originalEnvironment.openAiApiKey)
   restoreEnvironment('OPENAI_MODEL', originalEnvironment.openAiModel)
+  restoreEnvironment('KV_REST_API_URL', originalEnvironment.kvRestApiUrl)
+  restoreEnvironment('KV_REST_API_TOKEN', originalEnvironment.kvRestApiToken)
   restoreEnvironment(
     'UPSTASH_REDIS_REST_TOKEN',
     originalEnvironment.upstashRedisRestToken
@@ -495,7 +503,8 @@ describe('source-bounded preview behavior', () => {
   it.each([
     'Why is outreach part of space traffic management?',
     'What are the hazards of reentry?',
-    'How does traffic management change from Moon to Mars?'
+    'How does traffic management change from Moon to Mars?',
+    'what exists in the corpus for Mars orbital traffic management?'
   ])(
     'returns a grounded preview and canonical sources for the displayed sample: %s',
     async (question) => {
@@ -550,6 +559,50 @@ describe('source-bounded preview behavior', () => {
 })
 
 describe('live OpenAI request and output contract', () => {
+  it('uses the complete Vercel Marketplace Redis pair for live answers', async () => {
+    const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi()
+    delete process.env.UPSTASH_REDIS_REST_URL
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
+    process.env.KV_REST_API_URL = 'https://marketplace-redis.example'
+    process.env.KV_REST_API_TOKEN = 'marketplace-test-token'
+
+    const result = await invoke()
+
+    expect(result.body).toMatchObject({ mode: 'openai' })
+    expect(ipLimit).toHaveBeenCalledTimes(1)
+    expect(globalLimit).toHaveBeenCalledTimes(1)
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
+
+  it.each(['KV_REST_API_URL', 'KV_REST_API_TOKEN'] as const)(
+    'makes no paid call when the Marketplace pair is missing %s', async (missingName) => {
+      const { fetchMock, ipLimit } = installSuccessfulOpenAi()
+      delete process.env.UPSTASH_REDIS_REST_URL
+      delete process.env.UPSTASH_REDIS_REST_TOKEN
+      process.env.KV_REST_API_URL = 'https://marketplace-redis.example'
+      process.env.KV_REST_API_TOKEN = 'marketplace-test-token'
+      delete process.env[missingName]
+
+      const result = await invoke()
+
+      expect(result.body).toMatchObject({ mode: 'preview' })
+      expect(ipLimit).not.toHaveBeenCalled()
+      expect(fetchMock).not.toHaveBeenCalled()
+    }
+  )
+
+  it('does not combine partial explicit Redis settings with the Marketplace pair', async () => {
+    const { fetchMock } = installSuccessfulOpenAi()
+    delete process.env.UPSTASH_REDIS_REST_TOKEN
+    process.env.KV_REST_API_URL = 'https://different-redis.example'
+    process.env.KV_REST_API_TOKEN = 'different-test-token'
+
+    const result = await invoke()
+
+    expect(result.body).toMatchObject({ mode: 'preview' })
+    expect(fetchMock).not.toHaveBeenCalled()
+  })
+
   it('pins the durable limiter dependencies and documents every live-mode gate', () => {
     const packageJson = JSON.parse(
       readFileSync(resolve(process.cwd(), 'package.json'), 'utf8')
@@ -750,9 +803,9 @@ describe('live OpenAI request and output contract', () => {
     )
 
     expect(bodies.map(({ model }) => model)).toEqual([
-      'gpt-5.6-luna',
-      'gpt-5.6-luna',
-      'gpt-5.6-luna'
+      'gpt-4.1-mini',
+      'gpt-4.1-mini',
+      'gpt-4.1-mini'
     ])
     expect(bodies[0].safety_identifier).toBe(bodies[1].safety_identifier)
     expect(bodies[2].safety_identifier).not.toBe(bodies[0].safety_identifier)

@@ -253,7 +253,7 @@ describe('clean-room repository policy', () => {
     const environment = read('.env.example')
 
     expect(environment).toMatch(/^OPENAI_API_KEY=\s*$/m)
-    expect(environment).toMatch(/^OPENAI_MODEL=gpt-5\.6-luna\s*$/m)
+    expect(environment).toMatch(/^OPENAI_MODEL=gpt-4\.1-mini\s*$/m)
     expect(environment).toMatch(/^ALLOWED_ORIGIN=\s*$/m)
     expect(environment).toMatch(/^ASK_LIVE_ENABLED=false\s*$/m)
     expect(environment).toMatch(/^UPSTASH_REDIS_REST_URL=\s*$/m)

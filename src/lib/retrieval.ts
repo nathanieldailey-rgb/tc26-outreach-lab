@@ -57,6 +57,14 @@ const FIELD_WEIGHTS = {
 
 const MINIMUM_RELEVANCE_SCORE = 8
 
+// Catalog requests include navigation words that are not part of the subject.
+// Remove these only when the question explicitly asks about the collection;
+// retain every subject word so unrelated questions still fail closed.
+const CATALOG_TERMS = new Set(['corpus', 'library', 'papers', 'publications', 'reports'])
+const CATALOG_NAVIGATION_TERMS = new Set([
+  ...CATALOG_TERMS, 'exist', 'exists', 'available', 'find', 'cover', 'covers', 'covering'
+])
+
 const QUERY_TERM_EQUIVALENTS: Readonly<
   Record<string, readonly string[]>
 > = {
@@ -127,7 +135,11 @@ export function retrieveKnowledge(
   question: string,
   limit = 3
 ): RetrievalResult[] {
-  const queryTokens = [...new Set(normalizeTokens(question))]
+  const questionTokens = normalizeTokens(question)
+  const isCatalogQuestion = questionTokens.some((token) => CATALOG_TERMS.has(token))
+  const queryTokens = [...new Set(questionTokens.filter(
+    (token) => !isCatalogQuestion || !CATALOG_NAVIGATION_TERMS.has(token)
+  ))]
   const resultLimit = Number.isFinite(limit) ? Math.max(0, Math.floor(limit)) : 3
 
   if (queryTokens.length === 0 || resultLimit === 0) {

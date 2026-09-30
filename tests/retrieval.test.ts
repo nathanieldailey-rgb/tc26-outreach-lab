@@ -8,6 +8,24 @@ const insufficientPreview =
   'Preview limitation: The public project knowledge base does not contain enough information to answer this question. Consult the linked publication records or ask a committee reviewer.'
 
 describe('knowledge retrieval', () => {
+  it.each([
+    'what exists in the corpus for Mars orbital traffic management?',
+    'Which publications cover Mars orbital traffic management?',
+    'Find available papers about Mars orbital traffic management'
+  ])('finds the Moon-Mars record in a catalog discovery question: %s', (question) => {
+    const results = retrieveKnowledge(question)
+    expect(results[0]?.slug).toBe('future-domains')
+    expect(collectSourceSlugs(results)).toContain('moon-to-mars')
+  })
+
+  it.each([
+    'What exists in the corpus for Mars cake?',
+    'Which publications cover collision avoidance insurance?',
+    'Find papers about space weather forecasts'
+  ])('does not discard unsupported subject words in catalog questions: %s', (question) => {
+    expect(retrieveKnowledge(question)).toEqual([])
+  })
+
   it('returns no results for an empty or stopword-only query', () => {
     expect(retrieveKnowledge('')).toEqual([])
     expect(retrieveKnowledge('  the AND of  ')).toEqual([])

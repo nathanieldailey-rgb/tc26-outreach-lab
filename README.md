@@ -36,10 +36,15 @@ Set secrets only in the hosting provider or an ignored `.env.local` file. Never 
 | --- | --- |
 | `ASK_LIVE_ENABLED` | Must be exactly `true` before the server will consider a live model call. It defaults to `false`. |
 | `OPENAI_API_KEY` | Server-only project key required for live mode. Empty selects preview mode. |
-| `OPENAI_MODEL` | Optional server-side model override; the example uses `gpt-5.6-luna`. |
+| `OPENAI_MODEL` | Optional server-side model override; defaults to `gpt-4.1-mini`, which supports the structured Responses API output used here. |
 | `ALLOWED_ORIGIN` | Required exact, comma-separated browser-origin allowlist for live mode. |
 | `UPSTASH_REDIS_REST_URL` | Server-only durable Redis endpoint required for shared rate limiting. |
 | `UPSTASH_REDIS_REST_TOKEN` | Server-only durable Redis credential required for shared rate limiting. |
+
+When Redis is provisioned through Vercel Marketplace, the server also accepts its
+`KV_REST_API_URL` and `KV_REST_API_TOKEN` pair. No secret copying or renaming is
+needed. Explicit `UPSTASH_REDIS_REST_*` settings take precedence as a pair; a
+partial pair keeps live mode disabled.
 
 Live mode **fails closed** to a labeled deterministic preview unless every required setting is present and both durable limits succeed. The shared limits allow no more than **8 live calls per IP per minute** and **60 live calls in any 24-hour window** across serverless instances. A Redis timeout, rejection, or configuration error cannot fall through to a paid model call. Use a dedicated OpenAI project and set its own budget alert or spend limit as an independent backstop.
 

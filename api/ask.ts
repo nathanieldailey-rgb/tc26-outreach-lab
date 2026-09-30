@@ -90,7 +90,7 @@ type ParsedBody =
   | { ok: false; status: 400 | 413; error: string }
 
 const JSON_CONTENT_TYPE = /^application\/json(?:\s*;|$)/i
-const DEFAULT_MODEL = 'gpt-5.6-luna'
+const DEFAULT_MODEL = 'gpt-4.1-mini'
 const MAX_QUESTION_CHARACTERS = 500
 const MAX_GROUNDED_INPUT_CHARACTERS = 12_000
 const MAX_UPSTREAM_OUTPUT_CHARACTERS = 12_000
@@ -180,8 +180,13 @@ function liveConfiguration(request: ApiRequest): LiveConfiguration | undefined {
   if (process.env.ASK_LIVE_ENABLED !== 'true') return undefined
 
   const apiKey = process.env.OPENAI_API_KEY?.trim()
-  const redisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim()
-  const redisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  const explicitRedisUrl = process.env.UPSTASH_REDIS_REST_URL?.trim()
+  const explicitRedisToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim()
+  // Vercel's Upstash integration supplies the KV_* pair. Keep credentials
+  // paired, and fail closed if an explicitly configured Upstash pair is partial.
+  const useExplicitRedis = Boolean(explicitRedisUrl || explicitRedisToken)
+  const redisUrl = useExplicitRedis ? explicitRedisUrl : process.env.KV_REST_API_URL?.trim()
+  const redisToken = useExplicitRedis ? explicitRedisToken : process.env.KV_REST_API_TOKEN?.trim()
   const allowedOrigins = configuredAllowedOrigins()
   const origin = getHeader(request, 'origin')
 
