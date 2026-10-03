@@ -907,6 +907,16 @@ describe('live OpenAI request and output contract', () => {
     })
   })
 
+  it('deduplicates valid model citations without discarding a usable answer', async () => {
+    installSuccessfulOpenAi({ output_text: JSON.stringify({
+      answer: 'Collision avoidance relies on orbital information and coordination.',
+      sourceSlugs: ['collision-avoidance', 'orbital-data-precision', 'collision-avoidance']
+    }) })
+    const result = await invoke({ body: { question: 'How can satellites avoid crashing into each other?' } })
+    expect(result.body).toMatchObject({ mode: 'openai' })
+    expect((result.body as { sources: unknown[] }).sources).toHaveLength(2)
+  })
+
   it('falls back through output content and parses joined output_text JSON blocks', async () => {
     installSuccessfulOpenAi({
       output: [
@@ -940,7 +950,6 @@ describe('live OpenAI request and output contract', () => {
     ['an empty answer', JSON.stringify({ answer: '   ', sourceSlugs: ['stm-outreach'] })],
     ['an oversized answer', JSON.stringify({ answer: 'x'.repeat(4_001), sourceSlugs: ['stm-outreach'] })],
     ['an unknown source slug', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['not-retrieved'] })],
-    ['a duplicate source slug', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['stm-outreach', 'stm-outreach'] })],
     ['an extra property', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['stm-outreach'], url: 'hidden' })],
     ['a URL', JSON.stringify({ answer: 'Read https://evil.example now.', sourceSlugs: ['stm-outreach'] })],
     ['a bare web address', JSON.stringify({ answer: 'Read www.evil.example now.', sourceSlugs: ['stm-outreach'] })],

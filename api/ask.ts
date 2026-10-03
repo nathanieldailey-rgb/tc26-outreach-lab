@@ -125,7 +125,7 @@ const SYSTEM_INSTRUCTIONS = [
   'Titles identify subject matter, not research results. Never label a topic overview as key findings or state that the publications demonstrate or prove a result. For findings requests, begin by explaining that full-paper findings are unavailable here.',
   'Do not include any URL in the answer and do not claim official status, approval, endorsement, or committee consensus.',
   'The application appends a non-official-status notice; do not repeat that notice in the answer.',
-  'Return a concise answer and select only relevant publication slugs supplied in the bibliographic metadata.',
+  'Return a concise answer of at most 120 words and select up to three unique, relevant publication slugs supplied in the bibliographic metadata. For collection overviews, prefer the synthesis record rather than listing every paper.',
   'For unrelated questions or questions with no supporting public record, return an empty sourceSlugs array. Never attach unrelated citations to make an unsupported answer look grounded.'
 ].join(' ')
 
@@ -648,15 +648,15 @@ function validateOpenAiAnswer(
   const allowedSlugs = new Set(
     sourcePublications.map((publication) => publication.slug)
   )
-  const sourceSlugs = parsed.sourceSlugs
+  const rawSourceSlugs = parsed.sourceSlugs
   if (
-    sourceSlugs.some(
+    rawSourceSlugs.some(
       (slug) => typeof slug !== 'string' || !allowedSlugs.has(slug)
-    ) ||
-    new Set(sourceSlugs).size !== sourceSlugs.length
+    )
   ) {
     return undefined
   }
+  const sourceSlugs = [...new Set(rawSourceSlugs as string[])]
 
   const safeAnswer = UNSUPPORTED_PAPER_RESULT_CLAIM.test(normalizedAnswer)
     ? `The public collection provides topic summaries and publication titles, not verified full-paper findings. Relevant publication records are: ${sourcePublications.filter(({ slug }) => sourceSlugs.includes(slug)).map(({ title }) => title).join('; ')}. Follow the source links for the papers themselves.`
