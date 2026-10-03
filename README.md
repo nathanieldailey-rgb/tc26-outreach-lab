@@ -8,7 +8,7 @@ The demonstrator explores a public discovery layer for the IAF-IAA-IISL Space Tr
 
 - A searchable, cross-volume **20-record** public metadata collection: 19 topic reports plus one synthesis paper.
 - **Three original outreach features** written for this project, each with a clear path to relevant DOI records.
-- “Ask the Committee” in two transparent states: deterministic **preview mode** and server-side **live mode** powered by the OpenAI Responses API.
+- “Ask the Committee” in three transparent states: direct **catalog count**, deterministic **preview mode**, and server-side **live mode** powered by the OpenAI Responses API.
 - Three short explainer-video concepts and a non-autoplay interactive storyboard.
 - Public article-pitch, feature-request, and pull-request paths for working-group collaboration.
 
@@ -29,6 +29,8 @@ Open the local URL printed by Vite to review the editorial interface. This plain
 Run the **full demonstration from a deployed preview** that includes the serverless function. On that preview, leaving `OPENAI_API_KEY` empty is intentional: the endpoint returns a visibly labeled deterministic preview mode answer. Verify the preview and its Ask response before a meeting.
 
 ### Ask modes on a deployed preview
+
+Unqualified count questions such as “How many publications currently exist?” are answered directly from the publication records, with a **Catalog count** label and DOI links. Counts update with the catalog and do not spend OpenAI credit or use the paid-call allowance. Normal request validation, origin checks, and request-rate limits still apply. Topic-, year-, or journal-qualified questions are not treated as whole-catalog totals. This is the website's collection count, not a claim about all TC26 publications.
 
 Set secrets only in the hosting provider or an ignored `.env.local` file. Never put an API key in source code, browser variables, screenshots, issues, or pull requests.
 

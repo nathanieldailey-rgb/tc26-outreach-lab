@@ -252,6 +252,21 @@ test('renders a source-bounded preview and preserves the submitted question', as
   )
 })
 
+test('answers the publication count using the real catalog handler', async ({ page }) => {
+  await page.route('**/api/ask', async (route) => {
+    const { question } = route.request().postDataJSON() as { question: string }
+    const result = await invokePreviewAsk(question)
+    await route.fulfill({ status: result.status, contentType: 'application/json', body: JSON.stringify(result.body) })
+  })
+  await openPrototype(page)
+  await page.getByLabel('Your question').fill('how many publications currently exist?')
+  await page.getByRole('button', { name: 'Ask this question' }).click()
+  await expect(page.getByText('Catalog count', { exact: true })).toBeVisible()
+  await expect(page.locator('.answer__text')).toContainText('20 publications: 19 topic reports and 1 synthesis paper')
+  await expect(page.locator('.answer__notice')).toContainText('No live model was called')
+  await expect(page.locator('.answer__sources a')).toHaveCount(20)
+})
+
 test('coordinates all question controls while an Ask request is loading', async ({
   page
 }) => {

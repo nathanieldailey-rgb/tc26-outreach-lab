@@ -374,6 +374,27 @@ describe('editorial application', () => {
     )
   })
 
+  it('renders catalog counts as a direct catalog answer, not preview or OpenAI', async () => {
+    const user = userEvent.setup()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        ...trustedAskResponse,
+        mode: 'catalog',
+        answer: 'The website catalog currently contains 20 publications: 19 topic reports and 1 synthesis paper.',
+        notice: 'Counted directly from the website publication catalog. No live model was called.'
+      })
+    }))
+    render(<App />)
+    const ask = sectionNamed(/ask the committee/i)
+    await user.type(within(ask).getByRole('textbox', { name: /your question/i }), 'how many publications currently exist?')
+    await user.click(within(ask).getByRole('button', { name: /ask this question/i }))
+    expect(await within(ask).findByText('Catalog count')).toBeVisible()
+    expect(within(ask).getByText(/20 publications: 19 topic reports/)).toBeVisible()
+    expect(within(ask).queryByText('OpenAI-assisted mode')).not.toBeInTheDocument()
+    expect(within(ask).queryByText('Deterministic preview mode')).not.toBeInTheDocument()
+  })
+
   it('posts the Ask JSON contract and renders loading, mode, sources, and notice', async () => {
     const user = userEvent.setup()
     let resolveRequest: ((response: Response) => void) | undefined

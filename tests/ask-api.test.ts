@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
 import * as askApi from '../api/ask'
+import { publications } from '../src/content/publications'
 import handler, {
   MAX_RATE_LIMIT_CLIENTS,
   MAX_REQUEST_BODY_BYTES,
@@ -226,6 +227,33 @@ afterAll(() => {
   )
   __resetRateLimitForTests()
   ;(askApi as DurableLimiterTestHook).__resetDurableLimitersForTests?.()
+})
+
+describe('catalog counts', () => {
+  it('answers the reported question from records without OpenAI or paid-call limits', async () => {
+    const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi()
+    const result = await invoke({ body: { question: 'how many publications currently exist?' } })
+    expect(result.status).toBe(200)
+    expect(result.body).toMatchObject({
+      mode: 'catalog',
+      answer: expect.stringContaining(`${publications.length} publications`),
+      notice: expect.stringContaining('No live model was called')
+    })
+    expect((result.body as { sources: unknown[] }).sources).toHaveLength(publications.length)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(ipLimit).not.toHaveBeenCalled()
+    expect(globalLimit).not.toHaveBeenCalled()
+  })
+
+  it('answers catalog counts even when no live configuration exists', async () => {
+    const result = await invoke({ body: { question: 'How many papers are in the library?' } })
+    expect(result.body).toMatchObject({ mode: 'catalog' })
+  })
+
+  it('does not return the overall count for a topic-specific count', async () => {
+    const result = await invoke({ body: { question: 'How many publications about Mars exist?' } })
+    expect(result.body).toMatchObject({ mode: 'preview' })
+  })
 })
 
 describe('method, CORS, and response headers', () => {

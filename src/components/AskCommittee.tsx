@@ -2,7 +2,7 @@ import { type FormEvent, useRef, useState } from 'react'
 
 export type AskResponse = {
   answer: string
-  mode: 'preview' | 'openai'
+  mode: 'preview' | 'openai' | 'catalog'
   sources: Array<{ title: string; href: string }>
   notice: string
 }
@@ -58,7 +58,7 @@ function isAskResponse(value: unknown): value is AskResponse {
   const candidate = value as Partial<AskResponse>
   return (
     hasVisibleText(candidate.answer) &&
-    (candidate.mode === 'preview' || candidate.mode === 'openai') &&
+    (candidate.mode === 'preview' || candidate.mode === 'openai' || candidate.mode === 'catalog') &&
     Array.isArray(candidate.sources) &&
     candidate.sources.every(
       (source) =>
@@ -245,7 +245,9 @@ export default function AskCommittee({
           <article className="answer" aria-labelledby="answer-title">
             <header>
               <p className={`mode-label mode-label--${answer.response.mode}`}>
-                {answer.response.mode === 'preview'
+                {answer.response.mode === 'catalog'
+                  ? 'Catalog count'
+                  : answer.response.mode === 'preview'
                   ? 'Deterministic preview mode'
                   : 'OpenAI-assisted mode'}
               </p>

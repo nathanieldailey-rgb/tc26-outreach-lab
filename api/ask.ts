@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { Ratelimit } from '@upstash/ratelimit'
 import { Redis } from '@upstash/redis'
+import { catalogCountAnswer } from '../src/lib/catalog.js'
 
 import {
   doiUrl,
@@ -38,7 +39,7 @@ type AskSource = {
 
 type AskPayload = {
   answer: string
-  mode: 'preview' | 'openai'
+  mode: 'preview' | 'openai' | 'catalog'
   sources: AskSource[]
   notice: string
 }
@@ -810,6 +811,17 @@ export default async function handler(
     sendJson(response, 400, {
       error: 'Question must contain between 1 and 500 characters.'
     })
+    return
+  }
+
+  const catalogAnswer = catalogCountAnswer(question)
+  if (catalogAnswer !== undefined) {
+    sendJson(response, 200, {
+      answer: catalogAnswer,
+      mode: 'catalog',
+      sources: sourcesForPublications(publications),
+      notice: `Counted directly from the website publication catalog. No live model was called. ${NON_OFFICIAL_NOTICE}`
+    } satisfies AskPayload)
     return
   }
 
