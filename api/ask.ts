@@ -106,6 +106,7 @@ const LIVE_GLOBAL_IDENTIFIER = 'all-live-calls'
 const DURABLE_LIMIT_TIMEOUT_MS = 2_000
 const URL_LIKE_TEXT = /(?:\b[a-z][a-z0-9+.-]*:\/\/|\/\/\S+|\bwww\.|\b10\.\d{4,9}\/\S+|\b(?:\d{1,3}\.){3}\d{1,3}(?:[/:]\S*)?|\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}(?:\/\S*)?)/i
 const PROHIBITED_INSTITUTIONAL_CLAIM = /(?:\b(?:official(?:ly)?|approved|approval|endorsed|authorized)\b|\b(?:committee|tc\s*26)\b.{0,60}\b(?:position|policy|guidance|view|statement|consensus|agreed|agreement|adopted|concluded|determined)\b|\b(?:position|policy|guidance|view|statement|consensus|agreement)\b.{0,60}\b(?:committee|tc\s*26)\b)/i
+const UNSUPPORTED_PAPER_RESULT_CLAIM = /\b(?:(?:key|main|principal)\s+(?:findings|results|conclusions)\s+(?:include|are|show)|(?:papers?|publications?|studies|reports?)\s+(?:demonstrate|prove|conclude|reveal|establish|found|showed))\b/i
 
 export const MAX_REQUEST_BODY_BYTES = 4_096
 export const OPENAI_TIMEOUT_MS = 8_000
@@ -121,6 +122,7 @@ const SYSTEM_INSTRUCTIONS = [
   'Never invent an official committee position, consensus, policy, paper finding, or source.',
   'Do not claim to have read linked paper full text, and do not substitute your answer for the linked publications.',
   'When asked for findings unavailable in this metadata-only collection, explain that limitation and offer the relevant topics or publication titles instead of inventing findings.',
+  'Titles identify subject matter, not research results. Never label a topic overview as key findings or state that the publications demonstrate or prove a result. For findings requests, begin by explaining that full-paper findings are unavailable here.',
   'Do not include any URL in the answer and do not claim official status, approval, endorsement, or committee consensus.',
   'The application appends a non-official-status notice; do not repeat that notice in the answer.',
   'Return a concise answer and select only relevant publication slugs supplied in the bibliographic metadata.',
@@ -656,10 +658,13 @@ function validateOpenAiAnswer(
     return undefined
   }
 
+  const safeAnswer = UNSUPPORTED_PAPER_RESULT_CLAIM.test(normalizedAnswer)
+    ? `The public collection provides topic summaries and publication titles, not verified full-paper findings. Relevant publication records are: ${sourcePublications.filter(({ slug }) => sourceSlugs.includes(slug)).map(({ title }) => title).join('; ')}. Follow the source links for the papers themselves.`
+    : answer
   return {
     answer: sourceSlugs.length === 0
       ? 'There is not enough information in this public collection to answer that question. I can help you explore space traffic management topics and locate relevant publications, but I cannot supply findings that are absent from the site summaries and catalog.'
-      : answer,
+      : safeAnswer,
     sourceSlugs: sourceSlugs as string[]
   }
 }
@@ -890,6 +895,6 @@ export default async function handler(
     answer: openAiAnswer.answer,
     mode: 'openai',
     sources: answerSources,
-    notice: `OpenAI-assisted answer grounded in site-owned public context. ${NON_OFFICIAL_NOTICE}`
+    notice: `OpenAI-assisted answer based on site-owned summaries and publication metadata, not paper full texts. ${NON_OFFICIAL_NOTICE}`
   } satisfies AskPayload)
 }

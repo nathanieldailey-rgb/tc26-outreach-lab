@@ -628,6 +628,21 @@ describe('live OpenAI request and output contract', () => {
     expect(JSON.parse(String(upstream.body.input)).bibliographicMetadata).toHaveLength(publications.length)
   })
 
+  it.each([
+    'Key findings include proven improvements in collision avoidance.',
+    'The publications demonstrate a reduction in collision risk.'
+  ])('replaces unsupported paper-result claims with a catalog orientation: %s', async (answer) => {
+    installSuccessfulOpenAi({ output_text: JSON.stringify({ answer, sourceSlugs: ['collision-avoidance'] }) })
+    const result = await invoke({ body: { question: 'Can you summarize the main findings of the publications?' } })
+    expect(result.body).toMatchObject({
+      mode: 'openai',
+      answer: expect.stringContaining('not verified full-paper findings'),
+      notice: expect.stringContaining('not paper full texts')
+    })
+    expect((result.body as { answer: string }).answer).not.toContain(answer)
+    expect((result.body as { answer: string }).answer).toContain('collision avoidance')
+  })
+
   it('uses the complete Vercel Marketplace Redis pair for live answers', async () => {
     const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi()
     delete process.env.UPSTASH_REDIS_REST_URL
