@@ -52,6 +52,8 @@ Live mode **fails closed** to a labeled deterministic preview unless every requi
 
 When live mode is enabled, the server sends the visitor's question, bounded site-owned public context, and a pseudonymous safety identifier to OpenAI. It sets `store: false`, but that setting is not a promise of zero abuse-monitoring retention. The form warns visitors before submission not to enter personal, confidential, controlled, or proprietary information. The API never sends journal PDFs, publisher abstracts, subscription text, or conversation history, and it falls back visibly if the model or validated structured output is unavailable.
 
+Live Ask interprets ordinary questions against all eight site-owned summaries and all 20 publication records, rather than requiring exact-word retrieval matches. The complete JSON context remains capped at 12,000 characters. The strict keyword retriever is used only for the no-model preview/fallback. Out-of-scope responses with no supporting source receive a fixed limitation message, not unsourced model claims. DOI allowlisting, output validation, and both durable spending limits still apply. Full-paper findings are unavailable unless separately added through an authorized content workflow.
+
 ## Verify a change
 
 ```bash

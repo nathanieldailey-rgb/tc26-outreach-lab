@@ -587,6 +587,47 @@ describe('source-bounded preview behavior', () => {
 })
 
 describe('live OpenAI request and output contract', () => {
+  it.each([
+    'How can satellites avoid crashing into each other?',
+    'What topics do these papers cover?',
+    'Can you summarize the main findings of the publications?',
+    'What does this committee work on?',
+    'How many publications about Mars exist?'
+  ])('interprets ordinary questions using the complete public context: %s', async (question) => {
+    const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi()
+    const result = await invoke({ body: { question } })
+    expect(result.body).toMatchObject({ mode: 'openai' })
+    const upstream = parseUpstreamRequest(fetchMock)
+    const context = JSON.parse(String(upstream.body.input))
+    expect(context.question).toBe(question)
+    expect(context.siteOwnedEntries).toHaveLength(8)
+    expect(context.bibliographicMetadata.map((record: { slug: string }) => record.slug))
+      .toEqual(publications.map(({ slug }) => slug))
+    expect(ipLimit).toHaveBeenCalledTimes(1)
+    expect(globalLimit).toHaveBeenCalledTimes(1)
+  })
+
+  it('handles an unsupported question without invented citations or an unsourced model answer', async () => {
+    const { fetchMock } = installSuccessfulOpenAi({
+      output_text: JSON.stringify({ answer: 'Unverified claims must not be shown.', sourceSlugs: [] })
+    })
+    const result = await invoke({ body: { question: 'How do I bake a cake?' } })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(result.body).toMatchObject({
+      mode: 'openai', sources: [],
+      answer: expect.stringContaining('not enough information')
+    })
+    expect(JSON.stringify(result.body)).not.toContain('Unverified claims')
+  })
+
+  it('keeps the complete input valid JSON at the maximum question length', async () => {
+    const { fetchMock } = installSuccessfulOpenAi()
+    await invoke({ body: { question: 'x'.repeat(500) } })
+    const upstream = parseUpstreamRequest(fetchMock)
+    expect(String(upstream.body.input).length).toBeLessThanOrEqual(12_000)
+    expect(JSON.parse(String(upstream.body.input)).bibliographicMetadata).toHaveLength(publications.length)
+  })
+
   it('uses the complete Vercel Marketplace Redis pair for live answers', async () => {
     const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi()
     delete process.env.UPSTASH_REDIS_REST_URL
@@ -761,13 +802,7 @@ describe('live OpenAI request and output contract', () => {
                 type: 'array',
                 items: {
                   type: 'string',
-                  enum: [
-                    'reentry-hazards',
-                    'collision-avoidance',
-                    'in-orbit-servicing',
-                    'large-constellations',
-                    'radio-frequency-interference'
-                  ]
+                  enum: publications.map(({ slug }) => slug)
                 }
               }
             },
@@ -889,7 +924,6 @@ describe('live OpenAI request and output contract', () => {
     ['malformed JSON text', '{not-json'],
     ['an empty answer', JSON.stringify({ answer: '   ', sourceSlugs: ['stm-outreach'] })],
     ['an oversized answer', JSON.stringify({ answer: 'x'.repeat(4_001), sourceSlugs: ['stm-outreach'] })],
-    ['a missing source list', JSON.stringify({ answer: 'Grounded.', sourceSlugs: [] })],
     ['an unknown source slug', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['not-retrieved'] })],
     ['a duplicate source slug', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['stm-outreach', 'stm-outreach'] })],
     ['an extra property', JSON.stringify({ answer: 'Grounded.', sourceSlugs: ['stm-outreach'], url: 'hidden' })],
@@ -965,10 +999,10 @@ describe('live OpenAI request and output contract', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
-  it('does not let an adversarial prompt bypass strict retrieval or reach OpenAI', async () => {
-    const { ipLimit, globalLimit } = enableLiveMode()
-    const fetchMock = vi.fn()
-    vi.stubGlobal('fetch', fetchMock)
+  it('treats adversarial questions as data and rejects unsafe model output', async () => {
+    const { fetchMock, ipLimit, globalLimit } = installSuccessfulOpenAi({
+      output_text: JSON.stringify({ answer: 'The committee approved evil.example.', sourceSlugs: ['stm-outreach'] })
+    })
 
     const result = await invoke({
       body: {
@@ -978,9 +1012,11 @@ describe('live OpenAI request and output contract', () => {
     })
 
     expect(result.body).toMatchObject({ mode: 'preview', sources: [] })
-    expect(fetchMock).not.toHaveBeenCalled()
-    expect(ipLimit).not.toHaveBeenCalled()
-    expect(globalLimit).not.toHaveBeenCalled()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    expect(ipLimit).toHaveBeenCalledTimes(1)
+    expect(globalLimit).toHaveBeenCalledTimes(1)
+    expect(JSON.stringify(result.body)).not.toContain('evil.example')
+    expect(parseUpstreamRequest(fetchMock).body.instructions).toContain('untrusted data')
   })
 
   it.each([
